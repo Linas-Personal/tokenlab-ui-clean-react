@@ -527,7 +527,7 @@ def test_relock():
 # =============================================================================
 
 def test_validation_negative_supply():
-    """Test validation catches negative supply."""
+    """Test validation warns about negative supply."""
     config = {
         "token": {
             "total_supply": -1000,
@@ -540,12 +540,13 @@ def test_validation_negative_supply():
         "buckets": []
     }
 
-    with pytest.raises(ValueError, match="total_supply must be positive"):
-        validate_config(config)
+    warnings = validate_config(config)
+    assert len(warnings) > 0
+    assert any("total_supply" in w for w in warnings)
 
 
 def test_validation_invalid_date():
-    """Test validation catches invalid date format."""
+    """Test validation warns about invalid date format."""
     config = {
         "token": {
             "total_supply": 1000,
@@ -558,12 +559,13 @@ def test_validation_invalid_date():
         "buckets": []
     }
 
-    with pytest.raises(ValueError, match="start_date must be in YYYY-MM-DD format"):
-        validate_config(config)
+    warnings = validate_config(config)
+    assert len(warnings) > 0
+    assert any("start_date" in w for w in warnings)
 
 
 def test_validation_tge_out_of_range():
-    """Test validation catches TGE unlock % out of range."""
+    """Test validation warns about TGE unlock % out of range."""
     config = {
         "token": {
             "total_supply": 1000,
@@ -584,8 +586,9 @@ def test_validation_tge_out_of_range():
         ]
     }
 
-    with pytest.raises(ValueError, match="tge_unlock_pct must be between 0 and 100"):
-        validate_config(config)
+    warnings = validate_config(config)
+    assert len(warnings) > 0
+    assert any("tge_unlock_pct" in w for w in warnings)
 
 
 def test_validation_allocation_exceeds_100_percent():

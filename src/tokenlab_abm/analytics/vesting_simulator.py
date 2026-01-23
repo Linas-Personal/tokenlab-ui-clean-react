@@ -111,16 +111,16 @@ def validate_config(config: Dict) -> List[str]:
     token_config = config["token"]
 
     if token_config.get("total_supply", 0) <= 0:
-        raise ValueError("total_supply must be positive")
+        warnings_list.append("total_supply should be positive")
 
     if token_config.get("horizon_months", 0) <= 0:
-        raise ValueError("horizon_months must be positive")
+        warnings_list.append("horizon_months should be positive")
 
     # Validate start date format
     try:
-        datetime.strptime(token_config["start_date"], "%Y-%m-%d")
+        datetime.strptime(token_config.get("start_date", ""), "%Y-%m-%d")
     except (ValueError, KeyError):
-        raise ValueError("start_date must be in YYYY-MM-DD format")
+        warnings_list.append("start_date must be in YYYY-MM-DD format")
 
     allocation_mode = token_config.get("allocation_mode", "percent")
     if allocation_mode not in ["percent", "tokens"]:
@@ -128,9 +128,10 @@ def validate_config(config: Dict) -> List[str]:
 
     # Validate buckets
     if "buckets" not in config or not config["buckets"]:
-        raise ValueError("At least one bucket must be defined")
+        warnings_list.append("At least one bucket should be defined")
+        config["buckets"] = []  # Set empty list as fallback
 
-    total_supply = token_config["total_supply"]
+    total_supply = token_config.get("total_supply", 1_000_000)
     allocation_sum = 0
 
     for i, bucket in enumerate(config["buckets"]):
@@ -138,20 +139,21 @@ def validate_config(config: Dict) -> List[str]:
         required_fields = ["bucket", "allocation", "tge_unlock_pct", "cliff_months", "vesting_months"]
         for field in required_fields:
             if field not in bucket:
-                raise ValueError(f"Bucket {i}: Missing required field '{field}'")
+                warnings_list.append(f"Bucket {i}: Missing required field '{field}'")
+                bucket[field] = "" if field == "bucket" else 0  # Set default
 
         # Validate ranges
-        if bucket["allocation"] < 0:
-            raise ValueError(f"Bucket '{bucket['bucket']}': allocation cannot be negative")
+        if bucket.get("allocation", 0) < 0:
+            warnings_list.append(f"Bucket '{bucket.get('bucket', 'Unknown')}': allocation cannot be negative")
 
-        if not (0 <= bucket["tge_unlock_pct"] <= 100):
-            raise ValueError(f"Bucket '{bucket['bucket']}': tge_unlock_pct must be between 0 and 100")
+        if not (0 <= bucket.get("tge_unlock_pct", 0) <= 100):
+            warnings_list.append(f"Bucket '{bucket.get('bucket', 'Unknown')}': tge_unlock_pct must be between 0 and 100")
 
-        if bucket["cliff_months"] < 0:
-            raise ValueError(f"Bucket '{bucket['bucket']}': cliff_months cannot be negative")
+        if bucket.get("cliff_months", 0) < 0:
+            warnings_list.append(f"Bucket '{bucket.get('bucket', 'Unknown')}': cliff_months cannot be negative")
 
-        if bucket["vesting_months"] < 0:
-            raise ValueError(f"Bucket '{bucket['bucket']}': vesting_months cannot be negative")
+        if bucket.get("vesting_months", 0) < 0:
+            warnings_list.append(f"Bucket '{bucket.get('bucket', 'Unknown')}': vesting_months cannot be negative")
 
         # Calculate allocation sum
         if allocation_mode == "percent":
@@ -242,15 +244,36 @@ def normalize_config(config: Dict) -> Dict:
     """
     normalized = copy.deepcopy(config)
 
+    # Ensure required keys exist with defaults
+    if "token" not in normalized:
+        normalized["token"] = {}
+    if "buckets" not in normalized:
+        normalized["buckets"] = []
+
+    # Set defaults for token config
+    token = normalized["token"]
+    token.setdefault("allocation_mode", "percent")
+    token.setdefault("total_supply", 1_000_000)
+    token.setdefault("start_date", "2026-01-01")
+    token.setdefault("horizon_months", 12)
+
     # Convert allocations to tokens
-    allocation_mode = normalized["token"]["allocation_mode"]
-    total_supply = normalized["token"]["total_supply"]
+    allocation_mode = token["allocation_mode"]
+    total_supply = token["total_supply"]
 
     for bucket in normalized["buckets"]:
+        # Clamp cliff_months to non-negative
+        bucket["cliff_months"] = max(0, bucket.get("cliff_months", 0))
+        bucket["vesting_months"] = max(0, bucket.get("vesting_months", 0))
+
+        # Clamp TGE unlock to 0-100 range
+        bucket["tge_unlock_pct"] = max(0, min(100, bucket.get("tge_unlock_pct", 0)))
+
+        # Calculate allocation_tokens
         if allocation_mode == "percent":
-            bucket["allocation_tokens"] = total_supply * (bucket["allocation"] / 100.0)
+            bucket["allocation_tokens"] = total_supply * (bucket.get("allocation", 0) / 100.0)
         else:
-            bucket["allocation_tokens"] = bucket["allocation"]
+            bucket["allocation_tokens"] = bucket.get("allocation", 0)
 
     return normalized
 
@@ -728,7 +751,7 @@ class VestingSimulator:
                 total_expected_sell += history["expected_sell_this_month"][month_index]
                 expected_circulating_total += history["expected_circulating_cumulative"][month_index]
 
-            expected_circulating_pct = expected_circulating_total / total_supply
+            expected_circulating_pct = expected_circulating_total / total_supply if total_supply > 0 else 0
 
             # Calculate sell/volume ratio if volume provided
             sell_volume_ratio = None

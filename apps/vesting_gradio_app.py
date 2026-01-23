@@ -161,10 +161,10 @@ def create_config_from_ui(
     }
 
     # Add Tier 2 configuration
-    if simulation_mode.lower() in ["tier2", "tier3"]:
+    if simulation_mode and str(simulation_mode).lower() in ["tier2", "tier3"]:
         # Parse cohort profiles (bucket:profile,bucket:profile)
         cohort_profile_dict = {}
-        if tier3_cohort_profiles and tier3_cohort_profiles.strip():
+        if tier3_cohort_profiles and str(tier3_cohort_profiles).strip():
             for pair in tier3_cohort_profiles.split(","):
                 if ":" in pair:
                     bucket, profile = pair.split(":", 1)
@@ -180,9 +180,9 @@ def create_config_from_ui(
             },
             "pricing": {
                 "enabled": tier2_pricing_enabled,
-                "model": tier2_pricing_model.lower(),
-                "initial_price": float(tier2_pricing_initial),
-                "elasticity": float(tier2_pricing_elasticity)
+                "model": str(tier2_pricing_model).lower() if tier2_pricing_model else "constant",
+                "initial_price": float(tier2_pricing_initial) if tier2_pricing_initial else 1.0,
+                "elasticity": float(tier2_pricing_elasticity) if tier2_pricing_elasticity else 0.5
             },
             "treasury": {
                 "enabled": tier2_treasury_enabled,
@@ -197,7 +197,7 @@ def create_config_from_ui(
         }
 
     # Add Tier 3 configuration
-    if simulation_mode.lower() == "tier3":
+    if simulation_mode and str(simulation_mode).lower() == "tier3":
         config["tier3"] = {
             "cohorts": {
                 "enabled": tier3_cohorts_enabled,
@@ -218,7 +218,10 @@ def run_simulation_from_ui(*args) -> Tuple:
 
     try:
         # Create config from UI inputs
-        config = create_config_from_ui(*args)
+        try:
+            config = create_config_from_ui(*args)
+        except Exception as e:
+            raise ValueError(f"Config creation failed: {str(e)}")
 
         # Validate config
         warnings = validate_config(config)
@@ -231,15 +234,24 @@ def run_simulation_from_ui(*args) -> Tuple:
         if isinstance(mode, str):
             mode = mode.lower()
 
-        if mode in ["tier2", "tier3"]:
-            simulator = VestingSimulatorAdvanced(config, mode=mode)
-        else:
-            simulator = VestingSimulator(config, mode="tier1")
+        try:
+            if mode in ["tier2", "tier3"]:
+                simulator = VestingSimulatorAdvanced(config, mode=mode)
+            else:
+                simulator = VestingSimulator(config, mode="tier1")
+        except Exception as e:
+            raise ValueError(f"Simulator initialization failed: {str(e)}")
 
-        df_bucket, df_global = simulator.run_simulation()
+        try:
+            df_bucket, df_global = simulator.run_simulation()
+        except Exception as e:
+            raise ValueError(f"Simulation execution failed: {str(e)}")
 
         # Generate charts
-        figs = simulator.make_charts(df_bucket, df_global)
+        try:
+            figs = simulator.make_charts(df_bucket, df_global)
+        except Exception as e:
+            raise ValueError(f"Chart generation failed: {str(e)}")
 
         # Generate summary cards
         cards = simulator.summary_cards
