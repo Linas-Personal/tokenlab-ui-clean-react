@@ -1,0 +1,76 @@
+{
+  "token": {
+    "name": "Example Token",
+    "total_supply": 1000000000,
+    "start_date": "2026-01-01",
+    "horizon_months": 36,
+    "allocation_mode": "percent"
+  },
+  "assumptions": {
+    "sell_pressure_level": "medium",
+    "avg_daily_volume_tokens": 1000000
+  },
+  "behaviors": {
+    "cliff_shock": {
+      "enabled": true,
+      "multiplier": 3.0,
+      "buckets": ["Team", "Seed"]
+    },
+    "price_trigger": {
+      "enabled": false,
+      "source": "scenario",
+      "scenario": "uptrend",
+      "take_profit": 0.5,
+      "stop_loss": -0.3,
+      "extra_sell_addon": 0.2,
+      "uploaded_price_series": null
+    },
+    "relock": {
+      "enabled": true,
+      "relock_pct": 0.3,
+      "lock_duration_months": 6
+    }
+  },
+  "buckets": [
+    {
+      "bucket": "Team",
+      "allocation": 20,
+      "tge_unlock_pct": 0,
+      "cliff_months": 12,
+      "vesting_months": 36,
+      "unlock_type": "linear"
+    },
+    {
+      "bucket": "Seed",
+      "allocation": 10,
+      "tge_unlock_pct": 10,
+      "cliff_months": 6,
+      "vesting_months": 18,
+      "unlock_type": "linear"
+    },
+    {
+      "bucket": "Private",
+      "allocation": 15,
+      "tge_unlock_pct": 15,
+      "cliff_months": 3,
+      "vesting_months": 12,
+      "unlock_type": "linear"
+    },
+    {
+      "bucket": "Treasury",
+      "allocation": 30,
+      "tge_unlock_pct": 0,
+      "cliff_months": 0,
+      "vesting_months": 48,
+      "unlock_type": "linear"
+    },
+    {
+      "bucket": "Liquidity",
+      "allocation": 25,
+      "tge_unlock_pct": 100,
+      "cliff_months": 0,
+      "vesting_months": 0,
+      "unlock_type": "linear"
+    }
+  ]
+}
