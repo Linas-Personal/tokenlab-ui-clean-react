@@ -1790,7 +1790,7 @@ class VestingSimulatorAdvanced(VestingSimulator):
         self.df_global = df_global
 
         # Calculate summary cards
-        self._calculate_summary_cards()
+        self.summary_cards = self._calculate_summary_cards()
 
         return df_bucket, df_global
 

@@ -305,7 +305,10 @@ End: {cards['circ_end_pct']:.1f}%"""
         )
 
     except Exception as e:
-        error_text = f"❌ Error: {str(e)}"
+        # Include full traceback for debugging
+        import traceback
+        tb = traceback.format_exc()
+        error_text = f"❌ Error: {str(e)}\n\nTraceback:\n{tb}"
         return (
             error_text,
             None, None, None,
