@@ -1,10 +1,10 @@
-# Core TokenLab dependencies
-matplotlib==3.5.2
-numpy==1.22.4
-pandas==1.5.2
-scipy==1.9.3
-statsmodels==0.13.2
-tqdm==4.64.0
+# Core dependencies (updated for Python 3.13 compatibility)
+matplotlib>=3.7.0
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+statsmodels>=0.14.0
+tqdm>=4.64.0
 
 # New dependencies for vesting simulator
 gradio>=4.0,<5.0
