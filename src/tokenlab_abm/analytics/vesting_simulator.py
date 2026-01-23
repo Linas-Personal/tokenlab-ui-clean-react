@@ -853,8 +853,8 @@ class VestingSimulator:
 
         ax.set_xlabel("Month", fontsize=12, fontweight="bold")
         ax.set_ylabel("Tokens Unlocked", fontsize=12, fontweight="bold")
-        ax.set_title("Monthly Unlock Schedule by Bucket", fontsize=14, fontweight="bold", pad=20)
-        ax.legend(title="Bucket", bbox_to_anchor=(1.05, 1), loc="upper left")
+        ax.set_title("Monthly Unlock Schedule by Bucket", fontsize=12, fontweight="bold", pad=20)
+        ax.legend(title="Bucket", bbox_to_anchor=(1.05, 1), loc="upper left", frameon=False)
         ax.grid(axis="y", alpha=0.3, linestyle="--")
 
         # Format y-axis
@@ -887,13 +887,13 @@ class VestingSimulator:
         ax2.tick_params(axis="y", labelcolor=color2)
         ax2.set_ylim(0, 100)
 
-        ax1.set_title("Expected Circulating Supply Over Time", fontsize=14, fontweight="bold", pad=20)
+        ax1.set_title("Expected Circulating Supply Over Time", fontsize=12, fontweight="bold", pad=20)
         ax1.grid(axis="both", alpha=0.3, linestyle="--")
 
         # Combined legend
         lines1, labels1 = ax1.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper left")
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper left", frameon=False)
 
         plt.tight_layout()
         return fig
@@ -1892,7 +1892,7 @@ class VestingSimulatorAdvanced(VestingSimulator):
         # Legends
         lines1, labels1 = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        ax.legend(lines1 + lines2, labels1 + labels2, loc="upper left")
+        ax.legend(lines1 + lines2, labels1 + labels2, loc="upper left", frameon=False)
 
         return fig
 
