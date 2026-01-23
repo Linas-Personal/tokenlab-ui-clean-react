@@ -907,7 +907,7 @@ class VestingSimulator:
 
         ax.set_xlabel("Month", fontsize=12, fontweight="bold")
         ax.set_ylabel("Expected Sell Volume", fontsize=12, fontweight="bold")
-        ax.set_title("Expected Monthly Sell Pressure", fontsize=14, fontweight="bold", pad=20)
+        ax.set_title("Expected Monthly Sell Pressure", fontsize=12, fontweight="bold", pad=20)
         ax.grid(axis="y", alpha=0.3, linestyle="--")
         ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{x/1e6:.0f}M" if x >= 1e6 else f"{x/1e3:.0f}K"))
 
@@ -1851,7 +1851,7 @@ class VestingSimulatorAdvanced(VestingSimulator):
 
         ax.set_xlabel("Month", fontsize=12)
         ax.set_ylabel("Price ($)", fontsize=12)
-        ax.set_title("Price Evolution (Dynamic Pricing)", fontsize=14, fontweight="bold")
+        ax.set_title("Price Evolution (Dynamic Pricing)", fontsize=12, fontweight="bold")
         ax.grid(True, alpha=0.3)
 
         return fig
@@ -1882,7 +1882,7 @@ class VestingSimulatorAdvanced(VestingSimulator):
         ax.set_xlabel("Month", fontsize=12)
         ax.set_ylabel("Tokens Staked", fontsize=12, color="#06A77D")
         ax2.set_ylabel("Participation Rate (%)", fontsize=12, color="#D90368")
-        ax.set_title("Staking Dynamics", fontsize=14, fontweight="bold")
+        ax.set_title("Staking Dynamics", fontsize=12, fontweight="bold")
 
         ax.tick_params(axis='y', labelcolor="#06A77D")
         ax2.tick_params(axis='y', labelcolor="#D90368")
