@@ -300,7 +300,7 @@ def import_config(file) -> Tuple:
 def create_ui():
     """Create Gradio UI."""
 
-    with gr.Blocks(title="TokenLab Vesting Simulator", theme=gr.themes.Soft()) as app:
+    with gr.Blocks(title="TokenLab Vesting Simulator") as app:
         gr.Markdown("""
         # 🪙 TokenLab Vesting & Allocation Simulator
 
@@ -362,7 +362,7 @@ def create_ui():
                 headers=["Bucket", "Allocation", "TGE %", "Cliff (mo)", "Vesting (mo)"],
                 datatype=["str", "number", "number", "number", "number"],
                 row_count="dynamic",
-                col_count=(5, "fixed"),
+                column_count=(5, "fixed"),
                 interactive=True,
                 wrap=True
             )
@@ -590,5 +590,6 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=7860,
         share=False,
-        show_error=True
+        show_error=True,
+        theme=gr.themes.Soft()
     )
