@@ -22,7 +22,8 @@ import matplotlib.pyplot as plt
 from tokenlab_abm.analytics.vesting_simulator import (
     VestingSimulator,
     VestingSimulatorAdvanced,
-    validate_config
+    validate_config,
+    normalize_config
 )
 
 
@@ -223,8 +224,12 @@ def run_simulation_from_ui(*args) -> Tuple:
         except Exception as e:
             raise ValueError(f"Config creation failed: {str(e)}")
 
-        # Validate config
+        # Validate config (returns warnings, raises on critical errors)
         warnings = validate_config(config)
+
+        # CRITICAL: Normalize config to fix invalid values (clamp negatives, out-of-range, etc.)
+        config = normalize_config(config)
+
         warning_text = ""
         if warnings:
             warning_text = "⚠️ Warnings:\n" + "\n".join(f"• {w}" for w in warnings)
@@ -285,9 +290,15 @@ End: {cards['circ_end_pct']:.1f}%"""
         with open(json_path, "w") as f:
             f.write(simulator.to_json())
 
+        # Extract first 3 charts (UI supports exactly 3 chart outputs)
+        # Defensive: Ensure we have at least 3 charts, pad with None if needed
+        chart1 = figs[0] if len(figs) > 0 else None
+        chart2 = figs[1] if len(figs) > 1 else None
+        chart3 = figs[2] if len(figs) > 2 else None
+
         return (
             warning_text,
-            figs[0], figs[1], figs[2],
+            chart1, chart2, chart3,
             card1_text, card2_text, card3_text,
             csv1_path, csv2_path, pdf_path, json_path,
             gr.update(visible=True)  # Show results section
@@ -878,7 +889,7 @@ def create_ui():
 if __name__ == "__main__":
     app = create_ui()
     app.launch(
-        server_name="0.0.0.0",
+        server_name="127.0.0.1",
         server_port=7860,
         share=False,
         show_error=True,

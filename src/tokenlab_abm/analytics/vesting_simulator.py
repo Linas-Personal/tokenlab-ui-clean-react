@@ -1750,8 +1750,10 @@ class VestingSimulatorAdvanced(VestingSimulator):
                     avg_daily_volume = self.volume_calculator.calculate_volume(
                         new_circulating, liquidity_deployed
                     )
-                except Exception:
-                    pass  # Use default if calculation fails
+                except Exception as e:
+                    # Log error but continue with default volume
+                    import warnings
+                    warnings.warn(f"Volume calculation failed (month {month_index}): {str(e)}. Using default.")
 
             # Try to get from config as secondary option
             if not self.volume_calculator:
