@@ -19,7 +19,11 @@ import gradio as gr
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from tokenlab_abm.analytics.vesting_simulator import VestingSimulator, validate_config
+from tokenlab_abm.analytics.vesting_simulator import (
+    VestingSimulator,
+    VestingSimulatorAdvanced,
+    validate_config
+)
 
 
 # =============================================================================
@@ -45,6 +49,7 @@ def create_config_from_ui(
     start_date: str,
     horizon_months: int,
     allocation_mode: str,
+    simulation_mode: str,
     # Vesting table
     vesting_table: pd.DataFrame,
     # Assumptions
@@ -64,7 +69,33 @@ def create_config_from_ui(
     # Relock
     relock_enabled: bool,
     relock_pct: float,
-    lock_duration: int
+    lock_duration: int,
+    # Tier 2: Staking
+    tier2_staking_enabled: bool,
+    tier2_staking_apy: float,
+    tier2_staking_capacity: float,
+    tier2_staking_lockup: int,
+    tier2_staking_rewards: bool,
+    # Tier 2: Pricing
+    tier2_pricing_enabled: bool,
+    tier2_pricing_model: str,
+    tier2_pricing_initial: float,
+    tier2_pricing_elasticity: float,
+    # Tier 2: Treasury
+    tier2_treasury_enabled: bool,
+    tier2_treasury_hold: float,
+    tier2_treasury_liquidity: float,
+    tier2_treasury_buyback: float,
+    # Tier 2: Volume
+    tier2_volume_enabled: bool,
+    tier2_volume_turnover: float,
+    # Tier 3: Cohorts
+    tier3_cohorts_enabled: bool,
+    tier3_cohort_profiles: str,
+    # Tier 3: Monte Carlo
+    tier3_mc_enabled: bool,
+    tier3_mc_trials: int,
+    tier3_mc_variance: float
 ) -> dict:
     """Create configuration dictionary from UI inputs."""
 
@@ -98,7 +129,8 @@ def create_config_from_ui(
             "total_supply": int(total_supply),
             "start_date": start_date,
             "horizon_months": int(horizon_months),
-            "allocation_mode": allocation_mode.lower()
+            "allocation_mode": allocation_mode.lower(),
+            "simulation_mode": simulation_mode.lower()
         },
         "assumptions": {
             "sell_pressure_level": sell_pressure_level,
@@ -128,6 +160,56 @@ def create_config_from_ui(
         "buckets": buckets
     }
 
+    # Add Tier 2 configuration
+    if simulation_mode.lower() in ["tier2", "tier3"]:
+        # Parse cohort profiles (bucket:profile,bucket:profile)
+        cohort_profile_dict = {}
+        if tier3_cohort_profiles and tier3_cohort_profiles.strip():
+            for pair in tier3_cohort_profiles.split(","):
+                if ":" in pair:
+                    bucket, profile = pair.split(":", 1)
+                    cohort_profile_dict[bucket.strip()] = profile.strip()
+
+        config["tier2"] = {
+            "staking": {
+                "enabled": tier2_staking_enabled,
+                "apy": float(tier2_staking_apy),
+                "capacity": float(tier2_staking_capacity),
+                "lockup": int(tier2_staking_lockup),
+                "include_rewards": tier2_staking_rewards
+            },
+            "pricing": {
+                "enabled": tier2_pricing_enabled,
+                "model": tier2_pricing_model.lower(),
+                "initial_price": float(tier2_pricing_initial),
+                "elasticity": float(tier2_pricing_elasticity)
+            },
+            "treasury": {
+                "enabled": tier2_treasury_enabled,
+                "hold_pct": float(tier2_treasury_hold),
+                "liquidity_pct": float(tier2_treasury_liquidity),
+                "buyback_pct": float(tier2_treasury_buyback)
+            },
+            "volume": {
+                "enabled": tier2_volume_enabled,
+                "turnover_rate": float(tier2_volume_turnover)
+            }
+        }
+
+    # Add Tier 3 configuration
+    if simulation_mode.lower() == "tier3":
+        config["tier3"] = {
+            "cohorts": {
+                "enabled": tier3_cohorts_enabled,
+                "bucket_profiles": cohort_profile_dict
+            },
+            "monte_carlo": {
+                "enabled": tier3_mc_enabled,
+                "num_trials": int(tier3_mc_trials),
+                "variance_level": float(tier3_mc_variance)
+            }
+        }
+
     return config
 
 
@@ -144,8 +226,16 @@ def run_simulation_from_ui(*args) -> Tuple:
         if warnings:
             warning_text = "⚠️ Warnings:\n" + "\n".join(f"• {w}" for w in warnings)
 
-        # Run simulation
-        simulator = VestingSimulator(config, mode="tier1")
+        # Run simulation with appropriate simulator
+        mode = config["token"].get("simulation_mode", "tier1")
+        if isinstance(mode, str):
+            mode = mode.lower()
+
+        if mode in ["tier2", "tier3"]:
+            simulator = VestingSimulatorAdvanced(config, mode=mode)
+        else:
+            simulator = VestingSimulator(config, mode="tier1")
+
         df_bucket, df_global = simulator.run_simulation()
 
         # Generate charts
@@ -342,6 +432,14 @@ def create_ui():
                 value="Percent"
             )
 
+            gr.Markdown("---")
+            simulation_mode = gr.Radio(
+                label="Simulation Mode",
+                choices=["Tier1", "Tier2", "Tier3"],
+                value="Tier1",
+                info="Tier1: Deterministic | Tier2: Dynamic TokenLab | Tier3: Monte Carlo + Cohorts"
+            )
+
         # =====================================================================
         # TAB B: VESTING TABLE
         # =====================================================================
@@ -493,7 +591,176 @@ def create_ui():
                     )
 
         # =====================================================================
-        # TAB D: RESULTS
+        # TAB D: TIER 2/3 ADVANCED CONFIGURATION
+        # =====================================================================
+
+        with gr.Tab("🚀 Advanced (Tier 2/3)"):
+            gr.Markdown("""
+            ### Tier 2/3 Advanced Features
+
+            **Tier 2** adds dynamic TokenLab integration:
+            - Dynamic staking with APY incentives
+            - Price-supply feedback via bonding curves
+            - Treasury strategies (hold/liquidity/buyback)
+            - Dynamic volume calculation
+
+            **Tier 3** adds uncertainty analysis:
+            - Monte Carlo simulation with parameter noise
+            - Cohort-based behavior modeling
+            """)
+
+            # Tier 2: Staking
+            with gr.Accordion("💰 Dynamic Staking (Tier 2)", open=False):
+                gr.Markdown("""
+                Replace simple relock with APY-based staking model.
+                """)
+                tier2_staking_enabled = gr.Checkbox(label="Enable Dynamic Staking", value=False)
+                with gr.Row():
+                    tier2_staking_apy = gr.Slider(
+                        label="Staking APY",
+                        minimum=0.0,
+                        maximum=0.50,
+                        value=0.15,
+                        step=0.01,
+                        info="Annual percentage yield for staking"
+                    )
+                    tier2_staking_capacity = gr.Slider(
+                        label="Capacity (% of Circulating)",
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=0.60,
+                        step=0.05,
+                        info="Max % of circulating that can stake"
+                    )
+                with gr.Row():
+                    tier2_staking_lockup = gr.Dropdown(
+                        label="Lockup Duration (months)",
+                        choices=[3, 6, 12, 24],
+                        value=6
+                    )
+                    tier2_staking_rewards = gr.Checkbox(
+                        label="Include Staking Rewards",
+                        value=True,
+                        info="Generate yield (increases supply)"
+                    )
+
+            # Tier 2: Pricing
+            with gr.Accordion("📈 Dynamic Pricing (Tier 2)", open=False):
+                gr.Markdown("""
+                Price responds to circulating supply changes.
+                """)
+                tier2_pricing_enabled = gr.Checkbox(label="Enable Dynamic Pricing", value=False)
+                with gr.Row():
+                    tier2_pricing_model = gr.Radio(
+                        label="Pricing Model",
+                        choices=["Constant", "Linear", "Bonding_Curve"],
+                        value="Bonding_Curve"
+                    )
+                    tier2_pricing_initial = gr.Number(
+                        label="Initial Price ($)",
+                        value=1.0,
+                        precision=2
+                    )
+                tier2_pricing_elasticity = gr.Slider(
+                    label="Price Elasticity",
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.5,
+                    step=0.05,
+                    info="Sensitivity to supply changes"
+                )
+
+            # Tier 2: Treasury
+            with gr.Accordion("🏦 Treasury Strategies (Tier 2)", open=False):
+                gr.Markdown("""
+                Treasury deployment: hold, provide liquidity, or buyback.
+                """)
+                tier2_treasury_enabled = gr.Checkbox(label="Enable Treasury Management", value=False)
+                with gr.Row():
+                    tier2_treasury_hold = gr.Slider(
+                        label="Hold %",
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=0.3,
+                        step=0.05
+                    )
+                    tier2_treasury_liquidity = gr.Slider(
+                        label="Liquidity %",
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=0.5,
+                        step=0.05
+                    )
+                    tier2_treasury_buyback = gr.Slider(
+                        label="Buyback %",
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=0.2,
+                        step=0.05
+                    )
+
+            # Tier 2: Volume
+            with gr.Accordion("📊 Dynamic Volume (Tier 2)", open=False):
+                gr.Markdown("""
+                Calculate trading volume based on circulating supply and liquidity.
+                """)
+                tier2_volume_enabled = gr.Checkbox(label="Enable Dynamic Volume", value=False)
+                tier2_volume_turnover = gr.Slider(
+                    label="Daily Turnover Rate",
+                    minimum=0.001,
+                    maximum=0.10,
+                    value=0.01,
+                    step=0.001,
+                    info="% of circulating traded daily"
+                )
+
+            gr.Markdown("---")
+            gr.Markdown("### Tier 3: Uncertainty Analysis")
+
+            # Tier 3: Cohorts
+            with gr.Accordion("👥 Cohort Behaviors (Tier 3)", open=False):
+                gr.Markdown("""
+                Different buckets have different behavior profiles.
+
+                **Profiles:**
+                - `high_stake`: Team, long-term holders (70% stake, 30% sell)
+                - `high_sell`: VCs, short-term holders (10% stake, 90% sell)
+                - `balanced`: Community (40% stake, 60% sell)
+                - `treasury`: Treasury (handled separately)
+                """)
+                tier3_cohorts_enabled = gr.Checkbox(label="Enable Cohort Behaviors", value=False)
+                tier3_cohort_profiles = gr.Textbox(
+                    label="Bucket Profiles (bucket:profile,bucket:profile)",
+                    placeholder="e.g., Team:high_stake,Seed:high_sell,Private:high_sell",
+                    value="",
+                    info="Map buckets to behavior profiles"
+                )
+
+            # Tier 3: Monte Carlo
+            with gr.Accordion("🎲 Monte Carlo Simulation (Tier 3)", open=False):
+                gr.Markdown("""
+                Run multiple trials with parameter noise to generate uncertainty bands.
+                """)
+                tier3_mc_enabled = gr.Checkbox(label="Enable Monte Carlo", value=False)
+                with gr.Row():
+                    tier3_mc_trials = gr.Slider(
+                        label="Number of Trials",
+                        minimum=10,
+                        maximum=500,
+                        value=100,
+                        step=10
+                    )
+                    tier3_mc_variance = gr.Slider(
+                        label="Variance Level",
+                        minimum=0.01,
+                        maximum=0.30,
+                        value=0.10,
+                        step=0.01,
+                        info="Parameter noise level"
+                    )
+
+        # =====================================================================
+        # TAB E: RESULTS
         # =====================================================================
 
         with gr.Tab("📊 Results"):
@@ -542,7 +809,7 @@ def create_ui():
             fn=run_simulation_from_ui,
             inputs=[
                 # Token setup
-                token_name, total_supply, start_date, horizon_months, allocation_mode,
+                token_name, total_supply, start_date, horizon_months, allocation_mode, simulation_mode,
                 # Vesting table
                 vesting_table,
                 # Assumptions
@@ -552,7 +819,19 @@ def create_ui():
                 # Price trigger
                 price_trigger_enabled, price_source, price_scenario, take_profit, stop_loss, extra_sell,
                 # Relock
-                relock_enabled, relock_pct, lock_duration
+                relock_enabled, relock_pct, lock_duration,
+                # Tier 2: Staking
+                tier2_staking_enabled, tier2_staking_apy, tier2_staking_capacity, tier2_staking_lockup, tier2_staking_rewards,
+                # Tier 2: Pricing
+                tier2_pricing_enabled, tier2_pricing_model, tier2_pricing_initial, tier2_pricing_elasticity,
+                # Tier 2: Treasury
+                tier2_treasury_enabled, tier2_treasury_hold, tier2_treasury_liquidity, tier2_treasury_buyback,
+                # Tier 2: Volume
+                tier2_volume_enabled, tier2_volume_turnover,
+                # Tier 3: Cohorts
+                tier3_cohorts_enabled, tier3_cohort_profiles,
+                # Tier 3: Monte Carlo
+                tier3_mc_enabled, tier3_mc_trials, tier3_mc_variance
             ],
             outputs=[
                 warnings_box,

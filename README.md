@@ -79,7 +79,7 @@ config = {
     ]
 }
 
-# Run simulation
+# Run Tier 1 simulation
 simulator = VestingSimulator(config, mode="tier1")
 df_bucket, df_global = simulator.run_simulation()
 
@@ -89,6 +89,59 @@ figs = simulator.make_charts(df_bucket, df_global)
 # Export
 simulator.export_csvs("./output")
 simulator.export_pdf("./output/report.pdf")
+```
+
+#### Using Tier 2/3 Advanced Features
+
+```python
+from tokenlab_abm.analytics.vesting_simulator import VestingSimulatorAdvanced
+
+# Add Tier 2/3 configuration
+config["tier2"] = {
+    "staking": {
+        "enabled": True,
+        "apy": 0.15,
+        "capacity": 0.60,
+        "lockup": 6,
+        "include_rewards": True
+    },
+    "pricing": {
+        "enabled": True,
+        "model": "bonding_curve",
+        "initial_price": 1.0,
+        "elasticity": 0.5
+    },
+    "treasury": {
+        "enabled": True,
+        "hold_pct": 0.3,
+        "liquidity_pct": 0.5,
+        "buyback_pct": 0.2
+    },
+    "volume": {
+        "enabled": True,
+        "turnover_rate": 0.01
+    }
+}
+
+config["tier3"] = {
+    "cohorts": {
+        "enabled": True,
+        "bucket_profiles": {
+            "Team": "high_stake",
+            "Seed": "high_sell"
+        }
+    }
+}
+
+# Run Tier 2/3 simulation
+simulator = VestingSimulatorAdvanced(config, mode="tier3")
+df_bucket, df_global = simulator.run_simulation()
+
+# Run Monte Carlo for uncertainty analysis
+df_stats, df_all_trials = simulator.run_monte_carlo(num_trials=100)
+
+# Generate enhanced charts (includes price evolution, staking dynamics)
+figs = simulator.make_charts()
 ```
 
 ## Documentation

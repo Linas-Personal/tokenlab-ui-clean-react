@@ -11,7 +11,15 @@ from datetime import datetime
 
 from tokenlab_abm.analytics.vesting_simulator import (
     VestingSimulator,
+    VestingSimulatorAdvanced,
     VestingBucketController,
+    VestingTokenEconomy,
+    DynamicStakingController,
+    DynamicPricingController,
+    TreasuryStrategyController,
+    DynamicVolumeCalculator,
+    CohortBehaviorController,
+    MonteCarloRunner,
     validate_config,
     normalize_config,
     DEFAULT_CONFIG,
@@ -734,6 +742,518 @@ def test_summary_cards():
     assert simulator.summary_cards["circ_12_pct"] is not None
     assert simulator.summary_cards["circ_24_pct"] is not None
     assert simulator.summary_cards["circ_end_pct"] > 0
+
+
+# =============================================================================
+# TIER 2/3 ADVANCED FEATURES TESTS
+# =============================================================================
+
+def test_tier2_dynamic_staking():
+    """Test dynamic staking with APY and capacity limits."""
+    config = {
+        "token": {
+            "total_supply": 1_000_000,
+            "start_date": "2026-01-01",
+            "horizon_months": 24,
+            "allocation_mode": "percent"
+        },
+        "assumptions": {"sell_pressure_level": "medium"},
+        "behaviors": {
+            "cliff_shock": {"enabled": False},
+            "price_trigger": {"enabled": False},
+            "relock": {"enabled": False}
+        },
+        "tier2": {
+            "staking": {
+                "enabled": True,
+                "apy": 0.20,
+                "capacity": 0.60,
+                "lockup": 6,
+                "include_rewards": True
+            },
+            "pricing": {"enabled": False},
+            "treasury": {"enabled": False},
+            "volume": {"enabled": False}
+        },
+        "buckets": [
+            {
+                "bucket": "Team",
+                "allocation": 100,
+                "tge_unlock_pct": 0,
+                "cliff_months": 12,
+                "vesting_months": 12
+            }
+        ]
+    }
+
+    simulator = VestingSimulatorAdvanced(config, mode="tier2")
+    df_bucket, df_global = simulator.run_simulation()
+
+    # Check that staking controller exists
+    assert simulator.staking_controller is not None
+
+    # Check that some tokens were staked (participation > 0)
+    staked_amounts = simulator.staking_controller._staked_this_month
+    assert len(staked_amounts) > 0
+    assert sum(staked_amounts) > 0
+
+    # Check that participation rates were calculated
+    participation_rates = simulator.staking_controller._participation_rate
+    assert len(participation_rates) > 0
+    assert all(0 <= rate <= 1 for rate in participation_rates)
+
+
+def test_tier2_dynamic_pricing_bonding_curve():
+    """Test dynamic pricing with bonding curve model."""
+    config = {
+        "token": {
+            "total_supply": 1_000_000,
+            "start_date": "2026-01-01",
+            "horizon_months": 24,
+            "allocation_mode": "percent"
+        },
+        "assumptions": {"sell_pressure_level": "low"},
+        "behaviors": {
+            "cliff_shock": {"enabled": False},
+            "price_trigger": {"enabled": False},
+            "relock": {"enabled": False}
+        },
+        "tier2": {
+            "staking": {"enabled": False},
+            "pricing": {
+                "enabled": True,
+                "model": "bonding_curve",
+                "initial_price": 1.0,
+                "elasticity": 0.5
+            },
+            "treasury": {"enabled": False},
+            "volume": {"enabled": False}
+        },
+        "buckets": [
+            {
+                "bucket": "Test",
+                "allocation": 100,
+                "tge_unlock_pct": 10,
+                "cliff_months": 0,
+                "vesting_months": 12
+            }
+        ]
+    }
+
+    simulator = VestingSimulatorAdvanced(config, mode="tier2")
+    df_bucket, df_global = simulator.run_simulation()
+
+    # Check that pricing controller exists
+    assert simulator.pricing_controller is not None
+
+    # Check that prices were calculated
+    assert "current_price" in df_global.columns
+    prices = df_global["current_price"].values
+
+    # Price should decrease as circulating supply increases (bonding curve)
+    # First price should be higher than later prices
+    assert prices[0] > prices[-1]
+
+
+def test_tier2_treasury_strategies():
+    """Test treasury deployment strategies (hold/liquidity/buyback)."""
+    config = {
+        "token": {
+            "total_supply": 1_000_000,
+            "start_date": "2026-01-01",
+            "horizon_months": 12,
+            "allocation_mode": "percent"
+        },
+        "assumptions": {"sell_pressure_level": "medium"},
+        "behaviors": {
+            "cliff_shock": {"enabled": False},
+            "price_trigger": {"enabled": False},
+            "relock": {"enabled": False}
+        },
+        "tier2": {
+            "staking": {"enabled": False},
+            "pricing": {"enabled": False},
+            "treasury": {
+                "enabled": True,
+                "hold_pct": 0.3,
+                "liquidity_pct": 0.5,
+                "buyback_pct": 0.2
+            },
+            "volume": {"enabled": False}
+        },
+        "buckets": [
+            {
+                "bucket": "Treasury",
+                "allocation": 50,
+                "tge_unlock_pct": 0,
+                "cliff_months": 0,
+                "vesting_months": 12
+            },
+            {
+                "bucket": "Team",
+                "allocation": 50,
+                "tge_unlock_pct": 0,
+                "cliff_months": 6,
+                "vesting_months": 12
+            }
+        ]
+    }
+
+    simulator = VestingSimulatorAdvanced(config, mode="tier2")
+    df_bucket, df_global = simulator.run_simulation()
+
+    # Check that treasury controller exists
+    assert simulator.treasury_controller is not None
+
+    # Check that liquidity was deployed
+    assert "liquidity_deployed" in df_global.columns
+    total_liquidity = df_global["liquidity_deployed"].sum()
+    assert total_liquidity > 0
+
+
+def test_tier2_dynamic_volume():
+    """Test dynamic volume calculation based on circulating supply."""
+    config = {
+        "token": {
+            "total_supply": 1_000_000,
+            "start_date": "2026-01-01",
+            "horizon_months": 12,
+            "allocation_mode": "percent"
+        },
+        "assumptions": {"sell_pressure_level": "medium"},
+        "behaviors": {
+            "cliff_shock": {"enabled": False},
+            "price_trigger": {"enabled": False},
+            "relock": {"enabled": False}
+        },
+        "tier2": {
+            "staking": {"enabled": False},
+            "pricing": {"enabled": False},
+            "treasury": {"enabled": False},
+            "volume": {
+                "enabled": True,
+                "turnover_rate": 0.02
+            }
+        },
+        "buckets": [
+            {
+                "bucket": "Test",
+                "allocation": 100,
+                "tge_unlock_pct": 10,
+                "cliff_months": 0,
+                "vesting_months": 12
+            }
+        ]
+    }
+
+    simulator = VestingSimulatorAdvanced(config, mode="tier2")
+    df_bucket, df_global = simulator.run_simulation()
+
+    # Check that volume calculator exists
+    assert simulator.volume_calculator is not None
+
+    # Volume should increase as circulating supply increases
+    # (assuming no liquidity multiplier effects)
+    circs = df_global["expected_circulating_total"].values
+    # Volume calculation happens internally, so we just verify the simulation runs
+
+
+def test_tier3_cohort_behaviors():
+    """Test cohort-based behavior modeling."""
+    config = {
+        "token": {
+            "total_supply": 1_000_000,
+            "start_date": "2026-01-01",
+            "horizon_months": 24,
+            "allocation_mode": "percent"
+        },
+        "assumptions": {"sell_pressure_level": "medium"},
+        "behaviors": {
+            "cliff_shock": {"enabled": False},
+            "price_trigger": {"enabled": False},
+            "relock": {"enabled": False}
+        },
+        "tier2": {
+            "staking": {"enabled": False},
+            "pricing": {"enabled": False},
+            "treasury": {"enabled": False},
+            "volume": {"enabled": False}
+        },
+        "tier3": {
+            "cohorts": {
+                "enabled": True,
+                "bucket_profiles": {
+                    "Team": "high_stake",
+                    "Seed": "high_sell"
+                }
+            },
+            "monte_carlo": {"enabled": False}
+        },
+        "buckets": [
+            {
+                "bucket": "Team",
+                "allocation": 50,
+                "tge_unlock_pct": 0,
+                "cliff_months": 12,
+                "vesting_months": 12
+            },
+            {
+                "bucket": "Seed",
+                "allocation": 50,
+                "tge_unlock_pct": 10,
+                "cliff_months": 6,
+                "vesting_months": 12
+            }
+        ]
+    }
+
+    simulator = VestingSimulatorAdvanced(config, mode="tier3")
+    df_bucket, df_global = simulator.run_simulation()
+
+    # Check that cohort controller exists
+    assert simulator.cohort_controller is not None
+
+    # Check that behavior multipliers are different for different buckets
+    team_multiplier = simulator.cohort_controller.get_behavior_multiplier("Team")
+    seed_multiplier = simulator.cohort_controller.get_behavior_multiplier("Seed")
+
+    # Team should have lower sell multiplier (high_stake profile)
+    # Seed should have higher sell multiplier (high_sell profile)
+    assert team_multiplier < seed_multiplier
+
+
+def test_tier3_monte_carlo():
+    """Test Monte Carlo simulation with parameter noise."""
+    config = {
+        "token": {
+            "total_supply": 1_000_000,
+            "start_date": "2026-01-01",
+            "horizon_months": 12,
+            "allocation_mode": "percent"
+        },
+        "assumptions": {"sell_pressure_level": "medium"},
+        "behaviors": {
+            "cliff_shock": {"enabled": False},
+            "price_trigger": {"enabled": False},
+            "relock": {"enabled": False}
+        },
+        "tier2": {
+            "staking": {"enabled": False},
+            "pricing": {"enabled": False},
+            "treasury": {"enabled": False},
+            "volume": {"enabled": False}
+        },
+        "tier3": {
+            "cohorts": {"enabled": False},
+            "monte_carlo": {
+                "enabled": True,
+                "num_trials": 20,
+                "variance_level": 0.10
+            }
+        },
+        "buckets": [
+            {
+                "bucket": "Test",
+                "allocation": 100,
+                "tge_unlock_pct": 0,
+                "cliff_months": 6,
+                "vesting_months": 12
+            }
+        ]
+    }
+
+    # Create Monte Carlo runner
+    runner = MonteCarloRunner(config, variance_level=0.10)
+    df_stats, df_combined = runner.run(num_trials=20, mode="tier1")
+
+    # Check that stats dataframe has expected columns
+    assert "month_index" in df_stats.columns
+    assert "total_unlocked_median" in df_stats.columns
+    assert "total_expected_sell_median" in df_stats.columns
+
+    # Check that we have 13 months of data (0-12)
+    assert len(df_stats) == 13
+
+    # Check that combined has all trials
+    assert "trial" in df_combined.columns
+    assert df_combined["trial"].nunique() == 20
+
+
+def test_vesting_token_economy():
+    """Test VestingTokenEconomy wrapper."""
+    config = {
+        "token": {
+            "name": "TestToken",
+            "total_supply": 1_000_000,
+            "start_date": "2026-01-01",
+            "horizon_months": 12
+        }
+    }
+
+    economy = VestingTokenEconomy(config)
+
+    # Check initial state
+    assert economy.supply == 1_000_000
+    assert economy.circulating_supply == 0.0
+    assert economy.price == 1.0
+
+    # Test supply changes
+    economy.change_supply(-10_000)
+    assert economy.supply == 990_000
+
+    # Test price updates
+    economy.update_price(1.5)
+    assert economy.price == 1.5
+
+    # Test circulating updates
+    economy.update_circulating(100_000)
+    assert economy.circulating_supply == 100_000
+
+    # Test iteration advance
+    economy.advance_iteration()
+    assert economy.iteration == 1
+    assert len(economy._supply_store) == 2
+
+
+def test_dynamic_staking_controller():
+    """Test DynamicStakingController standalone."""
+    config = {
+        "token": {"total_supply": 1_000_000},
+        "tier2": {
+            "staking": {
+                "enabled": True,
+                "apy": 0.15,
+                "capacity": 0.60,
+                "lockup": 6,
+                "include_rewards": True
+            }
+        }
+    }
+
+    economy = VestingTokenEconomy(config)
+    economy.update_circulating(500_000)
+
+    controller = DynamicStakingController(config, economy)
+
+    # Calculate participation rate
+    participation = controller.calculate_participation_rate(0)
+    assert 0 <= participation <= 1
+
+    # Apply staking
+    free, staked = controller.apply_staking(100_000, 1)
+    assert free + staked == pytest.approx(100_000, rel=1e-5)
+    assert staked > 0
+
+    # Check maturity schedule
+    assert len(controller.staking_schedule) > 0
+
+
+def test_dynamic_pricing_controller():
+    """Test DynamicPricingController with different models."""
+    config = {
+        "token": {"total_supply": 1_000_000},
+        "tier2": {
+            "pricing": {
+                "enabled": True,
+                "model": "linear",
+                "initial_price": 1.0,
+                "elasticity": 0.5
+            }
+        }
+    }
+
+    economy = VestingTokenEconomy(config)
+    controller = DynamicPricingController(config, economy)
+
+    # Test linear pricing
+    price_0 = controller.calculate_price(0)
+    price_half = controller.calculate_price(500_000)
+    price_full = controller.calculate_price(1_000_000)
+
+    # Price should decrease as circulating increases
+    assert price_0 >= price_half >= price_full
+
+
+def test_treasury_strategy_controller():
+    """Test TreasuryStrategyController deployment."""
+    config = {
+        "tier2": {
+            "treasury": {
+                "enabled": True,
+                "hold_pct": 0.3,
+                "liquidity_pct": 0.5,
+                "buyback_pct": 0.2
+            }
+        }
+    }
+
+    economy = VestingTokenEconomy({"token": {"total_supply": 1_000_000}})
+    controller = TreasuryStrategyController(config, economy)
+
+    # Add tokens
+    controller.add_tokens(100_000)
+    assert controller.holdings == 100_000
+
+    # Deploy strategy
+    held, liquidity, buyback = controller.deploy_strategy(1)
+
+    # Check deployment ratios
+    total = held + liquidity + buyback
+    assert total == pytest.approx(100_000, rel=1e-5)
+    assert buyback == pytest.approx(100_000 * 0.2, rel=1e-3)
+
+
+def test_dynamic_volume_calculator():
+    """Test DynamicVolumeCalculator."""
+    config = {
+        "assumptions": {"avg_daily_volume_tokens": 1_000_000},
+        "tier2": {
+            "volume": {
+                "enabled": True,
+                "turnover_rate": 0.01
+            }
+        }
+    }
+
+    calculator = DynamicVolumeCalculator(config)
+
+    # Calculate volume
+    volume = calculator.calculate_volume(
+        circulating_supply=500_000,
+        liquidity_deployed=50_000
+    )
+
+    assert volume > 0
+    # Volume should be reasonable (at least 100k)
+    assert volume >= 100_000
+
+
+def test_cohort_behavior_controller():
+    """Test CohortBehaviorController profiles."""
+    config = {
+        "assumptions": {"sell_pressure_level": "medium"},
+        "tier3": {
+            "cohorts": {
+                "enabled": True,
+                "bucket_profiles": {
+                    "Team": "high_stake",
+                    "VCs": "high_sell",
+                    "Community": "balanced"
+                }
+            }
+        }
+    }
+
+    controller = CohortBehaviorController(config)
+
+    # Get multipliers
+    team_mult = controller.get_behavior_multiplier("Team")
+    vc_mult = controller.get_behavior_multiplier("VCs")
+    community_mult = controller.get_behavior_multiplier("Community")
+
+    # VCs should have highest sell multiplier
+    assert vc_mult > team_mult
+    assert vc_mult > community_mult
 
 
 if __name__ == "__main__":

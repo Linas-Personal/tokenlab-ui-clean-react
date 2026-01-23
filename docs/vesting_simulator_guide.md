@@ -6,8 +6,10 @@
 3. [Quick Start](#quick-start)
 4. [Features](#features)
 5. [Configuration](#configuration)
-6. [Use Cases](#use-cases)
-7. [API Reference](#api-reference)
+6. [Tier 2: Dynamic TokenLab Integration](#tier-2-dynamic-tokenlab-integration)
+7. [Tier 3: Advanced Uncertainty Analysis](#tier-3-advanced-uncertainty-analysis)
+8. [Use Cases](#use-cases)
+9. [API Reference](#api-reference)
 
 ## Introduction
 
@@ -296,6 +298,211 @@ Complete configuration export for reproducibility. Can be imported to restore ex
 - Allocation mode "percent": sum should equal 100% (warns if not)
 - Allocation mode "tokens": sum must not exceed total supply
 
+## Tier 2: Dynamic TokenLab Integration
+
+Tier 2 adds dynamic economic modeling using TokenLab components. These features make the simulation more realistic by modeling feedback loops and economic dynamics.
+
+### Dynamic Staking with APY
+
+**Purpose**: Replace simple relock with realistic staking behavior based on incentives.
+
+**Features**:
+- **APY-Based Participation**: Higher APY → higher participation rate
+- **Capacity Limits**: Max % of circulating supply that can stake
+- **Yield Generation**: Optional staking rewards (increases supply)
+- **Maturity Tracking**: Automatically tracks when staked tokens unlock
+
+**Configuration**:
+```json
+"tier2": {
+  "staking": {
+    "enabled": true,
+    "apy": 0.15,
+    "capacity": 0.60,
+    "lockup": 6,
+    "include_rewards": true
+  }
+}
+```
+
+**Example**: With 15% APY and 60% capacity:
+- Month 13: 100M unlocks, 60M can stake (capacity limit)
+- Participation: ~70% of available capacity stakes
+- Month 19: 42M matures (principal + 6-month yield)
+
+### Dynamic Pricing
+
+**Purpose**: Model price response to circulating supply changes.
+
+**Models**:
+1. **Constant**: Fixed price (Tier 1 behavior)
+2. **Linear**: P = P₀ × (1 - elasticity × (S/S_max))
+3. **Bonding Curve**: P = P₀ × (S_max / S)^elasticity
+
+**Configuration**:
+```json
+"tier2": {
+  "pricing": {
+    "enabled": true,
+    "model": "bonding_curve",
+    "initial_price": 1.0,
+    "elasticity": 0.5
+  }
+}
+```
+
+**Example**: Bonding curve with elasticity 0.5:
+- 10% circulating → price = $3.16
+- 50% circulating → price = $1.41
+- 100% circulating → price = $1.00
+
+### Treasury Strategies
+
+**Purpose**: Model treasury deployment decisions (hold vs provide liquidity vs buyback).
+
+**Strategies**:
+- **Hold**: Keep tokens in treasury (not circulating)
+- **Liquidity**: Deploy to DEX (counts as circulating, increases volume)
+- **Buyback**: Remove from total supply (deflationary)
+
+**Configuration**:
+```json
+"tier2": {
+  "treasury": {
+    "enabled": true,
+    "hold_pct": 0.3,
+    "liquidity_pct": 0.5,
+    "buyback_pct": 0.2
+  }
+}
+```
+
+**Example**: Treasury unlocks 100M per month:
+- 30M held (not circulating)
+- 50M deployed to liquidity (increases circulating + trading volume)
+- 20M bought back (reduces total supply from 1B to 980M)
+
+### Dynamic Volume
+
+**Purpose**: Calculate trading volume based on circulating supply and liquidity.
+
+**Formula**: Volume = circulating × turnover_rate × liquidity_multiplier
+
+**Configuration**:
+```json
+"tier2": {
+  "volume": {
+    "enabled": true,
+    "turnover_rate": 0.01
+  }
+}
+```
+
+**Example**: With 1% turnover:
+- 100M circulating, 10M liquidity → ~316K daily volume
+- 500M circulating, 50M liquidity → ~1.58M daily volume
+
+## Tier 3: Advanced Uncertainty Analysis
+
+Tier 3 adds Monte Carlo simulation and cohort-based behavior modeling for uncertainty quantification.
+
+### Monte Carlo Simulation
+
+**Purpose**: Generate uncertainty bands (P10, P50, P90) by running multiple trials with randomized parameters.
+
+**Randomized Parameters**:
+- **Cliff Timing**: ±1-2 months
+- **TGE Unlock %**: ±5%
+- **Vesting Duration**: ±10%
+- **Sell Pressure**: ±5%
+
+**Configuration**:
+```json
+"tier3": {
+  "monte_carlo": {
+    "enabled": true,
+    "num_trials": 100,
+    "variance_level": 0.10
+  }
+}
+```
+
+**Usage**:
+```python
+simulator = VestingSimulatorAdvanced(config, mode="tier3")
+df_stats, df_all = simulator.run_monte_carlo(num_trials=100)
+
+# df_stats contains P10, P50, P90 per month
+p10_sell = df_stats["total_expected_sell_<lambda>"]  # 10th percentile
+p50_sell = df_stats["total_expected_sell_median"]    # Median
+p90_sell = df_stats["total_expected_sell_<lambda>.1"] # 90th percentile
+```
+
+**Example**: Month 13 expected sell:
+- P10: 15.2M (optimistic case)
+- P50: 18.7M (median case)
+- P90: 22.1M (pessimistic case)
+
+### Cohort-Based Behaviors
+
+**Purpose**: Different allocation buckets have different behavior profiles.
+
+**Behavior Profiles**:
+
+| Profile | Stake % | Sell % | Description |
+|---------|---------|--------|-------------|
+| `high_stake` | 70% | 30% | Team, long-term holders |
+| `high_sell` | 10% | 90% | VCs, short-term holders |
+| `balanced` | 40% | 60% | Community |
+| `treasury` | 0% | 0% | Treasury (handled separately) |
+
+**Configuration**:
+```json
+"tier3": {
+  "cohorts": {
+    "enabled": true,
+    "bucket_profiles": {
+      "Team": "high_stake",
+      "Seed": "high_sell",
+      "Private": "high_sell",
+      "Community": "balanced"
+    }
+  }
+}
+```
+
+**Example**: With base sell pressure 25%:
+- Team (high_stake): Effective sell ~8.3% (70% stake, 30% of 25% sell)
+- Seed (high_sell): Effective sell ~90% (10% stake, 90% of 25% sell)
+- Community (balanced): Effective sell ~60% (40% stake, 60% of 25% sell)
+
+### Combining Tier 2 + Tier 3
+
+You can enable both tiers simultaneously for maximum realism:
+
+```python
+config = {
+    "token": {...},
+    "assumptions": {...},
+    "behaviors": {...},
+    "tier2": {
+        "staking": {"enabled": True, ...},
+        "pricing": {"enabled": True, ...},
+        "treasury": {"enabled": True, ...},
+        "volume": {"enabled": True, ...}
+    },
+    "tier3": {
+        "cohorts": {"enabled": True, ...},
+        "monte_carlo": {"enabled": True, ...}
+    },
+    "buckets": [...]
+}
+
+simulator = VestingSimulatorAdvanced(config, mode="tier3")
+df_bucket, df_global = simulator.run_simulation()
+df_stats, df_all = simulator.run_monte_carlo(num_trials=100)
+```
+
 ## Use Cases
 
 ### 1. Investor Due Diligence
@@ -376,18 +583,68 @@ Complete configuration export for reproducibility. Can be imported to restore ex
 
 ## API Reference
 
-### VestingSimulator Class
+### VestingSimulator Class (Tier 1)
 
 ```python
 class VestingSimulator:
     def __init__(self, config: dict, mode: str = "tier1")
     def run_simulation() -> Tuple[pd.DataFrame, pd.DataFrame]
-    def make_charts() -> List[plt.Figure]
+    def make_charts(df_bucket: pd.DataFrame, df_global: pd.DataFrame) -> List[plt.Figure]
     def export_csvs(output_dir: str) -> Tuple[str, str]
     def export_pdf(output_path: str) -> str
     def to_json() -> str
     @staticmethod
     def from_json(json_str: str) -> VestingSimulator
+```
+
+### VestingSimulatorAdvanced Class (Tier 2/3)
+
+```python
+class VestingSimulatorAdvanced(VestingSimulator):
+    def __init__(self, config: dict, mode: str = "tier1")  # mode: "tier1", "tier2", or "tier3"
+    def run_simulation() -> Tuple[pd.DataFrame, pd.DataFrame]
+    def make_charts() -> List[plt.Figure]  # Includes extra charts for Tier 2/3
+    def run_monte_carlo(num_trials: int = 100) -> Tuple[pd.DataFrame, pd.DataFrame]
+    def export_csvs(output_dir: str) -> Tuple[str, str]
+    def export_pdf(output_path: str) -> str
+```
+
+**Tier 2/3 Component Classes**:
+
+```python
+# Tier 2: Staking
+class DynamicStakingController:
+    def __init__(self, config: dict, vesting_economy: VestingTokenEconomy)
+    def calculate_participation_rate(self, month_index: int) -> float
+    def apply_staking(self, unlocked_amount: float, month_index: int) -> Tuple[float, float]
+    def get_matured_stake(self, month_index: int) -> float
+
+# Tier 2: Pricing
+class DynamicPricingController:
+    def __init__(self, config: dict, vesting_economy: VestingTokenEconomy)
+    def calculate_price(self, circulating_supply: float) -> float
+
+# Tier 2: Treasury
+class TreasuryStrategyController:
+    def __init__(self, config: dict, vesting_economy: VestingTokenEconomy)
+    def add_tokens(self, amount: float)
+    def deploy_strategy(self, month_index: int) -> Tuple[float, float, float]
+
+# Tier 2: Volume
+class DynamicVolumeCalculator:
+    def __init__(self, config: dict)
+    def calculate_volume(self, circulating_supply: float, liquidity_deployed: float) -> float
+
+# Tier 3: Monte Carlo
+class MonteCarloRunner:
+    def __init__(self, base_config: dict, variance_level: float = 0.10)
+    def apply_noise(self, config: dict, seed: int) -> dict
+    def run(self, num_trials: int = 100, mode: str = "tier2") -> Tuple[pd.DataFrame, pd.DataFrame]
+
+# Tier 3: Cohorts
+class CohortBehaviorController:
+    def __init__(self, config: dict)
+    def get_behavior_multiplier(self, bucket_name: str) -> float
 ```
 
 ### Helper Functions
@@ -404,6 +661,18 @@ class VestingBucketController:
     def __init__(self, bucket_config: dict, global_config: dict)
     def execute(month_index: int, current_price: float, initial_price: float) -> float
     def get_history() -> dict
+    def reset()
+```
+
+### VestingTokenEconomy Class
+
+```python
+class VestingTokenEconomy:
+    def __init__(self, config: dict)
+    def change_supply(self, delta: float)
+    def update_price(self, new_price: float)
+    def update_circulating(self, new_circulating: float)
+    def advance_iteration()
     def reset()
 ```
 
@@ -434,11 +703,31 @@ class VestingBucketController:
 
 ## Changelog
 
+### v0.2.0 (2026-01-23)
+- **Tier 2: Dynamic TokenLab Integration**
+  - Dynamic staking with APY incentives and capacity limits
+  - Dynamic pricing with bonding curves and linear demand models
+  - Treasury strategies (hold/liquidity/buyback)
+  - Dynamic volume calculation based on circulating supply
+- **Tier 3: Advanced Uncertainty Analysis**
+  - Monte Carlo simulation with parameter noise (P10/P50/P90 bands)
+  - Cohort-based behavior modeling (different profiles per bucket)
+- **UI Enhancements**
+  - Added "Advanced (Tier 2/3)" configuration tab in Gradio UI
+  - Simulation mode selector (Tier1/Tier2/Tier3)
+  - Additional charts for price evolution and staking dynamics
+- **Testing**
+  - Expanded test suite to 29 tests (17 Tier 1 + 12 Tier 2/3)
+  - 100% test pass rate
+- **Documentation**
+  - Comprehensive Tier 2/3 feature documentation
+  - Updated API reference for VestingSimulatorAdvanced
+
 ### v0.1.0 (2026-01-23)
 - Initial release
 - Tier 1 deterministic vesting simulator
 - Gradio web interface
-- 3 behavioral modifiers
+- 3 behavioral modifiers (cliff shock, price triggers, relock)
 - CSV, PDF, JSON exports
 - Comprehensive test suite (17 tests)
 
