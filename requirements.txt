@@ -1,16 +1,16 @@
-# Core dependencies (updated for Python 3.13 compatibility)
-matplotlib>=3.7.0
-numpy>=1.24.0
-pandas>=2.0.0
-scipy>=1.10.0
-statsmodels>=0.14.0
-tqdm>=4.64.0
+# Core dependencies (pinned versions for production)
+matplotlib==3.10.3
+numpy==2.2.6
+pandas==2.3.0
+scipy==1.15.3
+statsmodels==0.14.4
+tqdm==4.67.1
 
-# New dependencies for vesting simulator
-gradio>=6.0
-python-dateutil>=2.8.0
-seaborn>=0.12.0
+# Vesting simulator dependencies
+gradio==6.4.0
+python-dateutil==2.9.0.post0
+seaborn==0.13.2
 
 # Testing
-pytest>=7.0.0
-pytest-cov>=3.0.0
+pytest==9.0.2
+pytest-cov==7.0.0

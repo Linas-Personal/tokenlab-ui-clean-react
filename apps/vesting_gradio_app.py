@@ -290,15 +290,16 @@ End: {cards['circ_end_pct']:.1f}%"""
         with open(json_path, "w") as f:
             f.write(simulator.to_json())
 
-        # Extract first 3 charts (UI supports exactly 3 chart outputs)
-        # Defensive: Ensure we have at least 3 charts, pad with None if needed
+        # Extract all charts (Tier 1: 3 charts, Tier 2/3: up to 5 charts)
         chart1 = figs[0] if len(figs) > 0 else None
         chart2 = figs[1] if len(figs) > 1 else None
         chart3 = figs[2] if len(figs) > 2 else None
+        chart4 = figs[3] if len(figs) > 3 else None  # Tier 2/3: Price evolution
+        chart5 = figs[4] if len(figs) > 4 else None  # Tier 2/3: Staking dynamics
 
         return (
             warning_text,
-            chart1, chart2, chart3,
+            chart1, chart2, chart3, chart4, chart5,
             card1_text, card2_text, card3_text,
             csv1_path, csv2_path, pdf_path, json_path,
             gr.update(visible=True)  # Show results section
@@ -311,7 +312,7 @@ End: {cards['circ_end_pct']:.1f}%"""
         error_text = f"❌ Error: {str(e)}\n\nTraceback:\n{tb}"
         return (
             error_text,
-            None, None, None,
+            None, None, None, None, None,
             "Error", "Error", "Error",
             None, None, None, None,
             gr.update(visible=False)
@@ -810,6 +811,12 @@ def create_ui():
 
                 chart3 = gr.Plot(label="Expected Monthly Sell Pressure")
 
+                gr.Markdown("### Tier 2/3 Additional Charts")
+                gr.Markdown("*These charts appear when Tier 2/3 features are enabled*")
+                with gr.Row():
+                    chart4 = gr.Plot(label="Price Evolution (Tier 2/3)", visible=True)
+                    chart5 = gr.Plot(label="Staking Dynamics (Tier 2/3)", visible=True)
+
                 gr.Markdown("### Exports")
                 with gr.Row():
                     csv1_file = gr.File(label="📄 Bucket Schedule CSV")
@@ -861,7 +868,7 @@ def create_ui():
             ],
             outputs=[
                 warnings_box,
-                chart1, chart2, chart3,
+                chart1, chart2, chart3, chart4, chart5,
                 card1, card2, card3,
                 csv1_file, csv2_file, pdf_file, json_file,
                 results_section
