@@ -1721,12 +1721,20 @@ class VestingSimulatorAdvanced(VestingSimulator):
             self.vesting_economy.update_circulating(new_circulating)
 
             # Calculate dynamic volume (Tier 2)
+            avg_daily_volume = 1_000_000  # Default fallback
             if self.volume_calculator:
-                avg_daily_volume = self.volume_calculator.calculate_volume(
-                    new_circulating, liquidity_deployed
-                )
-            else:
-                avg_daily_volume = self.config["assumptions"].get("avg_daily_volume_tokens", 1_000_000) or 1_000_000
+                try:
+                    avg_daily_volume = self.volume_calculator.calculate_volume(
+                        new_circulating, liquidity_deployed
+                    )
+                except Exception:
+                    pass  # Use default if calculation fails
+
+            # Try to get from config as secondary option
+            if not self.volume_calculator:
+                config_volume = self.config.get("assumptions", {}).get("avg_daily_volume_tokens")
+                if config_volume:
+                    avg_daily_volume = config_volume
 
             # Store global row
             circulating_pct = (new_circulating / self.total_supply * 100) if self.total_supply > 0 else 0
@@ -1790,17 +1798,22 @@ class VestingSimulatorAdvanced(VestingSimulator):
             # Chart 4: Price Evolution (if dynamic pricing)
             if self.pricing_controller and self.pricing_controller.pricing_config.get("enabled", False):
                 fig4 = self._make_price_chart(df_global)
-                base_charts.append(fig4)
+                if fig4 is not None:
+                    base_charts.append(fig4)
 
             # Chart 5: Staking Dynamics (if dynamic staking)
             if self.staking_controller and self.staking_controller.staking_config.get("enabled", False):
                 fig5 = self._make_staking_chart()
-                base_charts.append(fig5)
+                if fig5 is not None:
+                    base_charts.append(fig5)
 
         return base_charts
 
     def _make_price_chart(self, df_global):
         """Generate price evolution chart."""
+        if df_global is None or "current_price" not in df_global.columns:
+            return None
+
         fig, ax = plt.subplots(figsize=(12, 5))
 
         ax.plot(
@@ -1820,12 +1833,16 @@ class VestingSimulatorAdvanced(VestingSimulator):
 
     def _make_staking_chart(self):
         """Generate staking dynamics chart."""
-        fig, ax = plt.subplots(figsize=(12, 5))
+        if not self.staking_controller:
+            return None
 
-        # Calculate staking metrics from history
         staked_amounts = self.staking_controller._staked_this_month
         participation_rates = self.staking_controller._participation_rate
 
+        if not staked_amounts or not participation_rates:
+            return None
+
+        fig, ax = plt.subplots(figsize=(12, 5))
         months = range(len(staked_amounts))
 
         ax2 = ax.twinx()
