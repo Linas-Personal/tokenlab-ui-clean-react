@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useForm, FormProvider, useFormContext } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
-import { Coins, Calendar, Settings, Rocket, BarChart3, Loader2 } from 'lucide-react'
+import { Coins, Calendar, Settings, Rocket, BarChart3, Loader2, Download, Upload } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,16 @@ import { api } from '@/lib/api'
 import type { SimulationConfig } from '@/types/config'
 import type { SimulationResponse } from '@/types/simulation'
 import { formatTokens, formatPercentage } from '@/lib/utils'
+import { UnlockScheduleChart } from '@/components/charts/UnlockScheduleChart'
+import { CirculatingSupplyChart } from '@/components/charts/CirculatingSupplyChart'
+import { SellPressureChart } from '@/components/charts/SellPressureChart'
+import { PriceEvolutionChart } from '@/components/charts/PriceEvolutionChart'
+import { StakingDynamicsChart } from '@/components/charts/StakingDynamicsChart'
 
 function App() {
   const [activeTab, setActiveTab] = useState('token-setup')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const methods = useForm<SimulationConfig>({
     defaultValues: DEFAULT_CONFIG
   })
@@ -35,6 +42,20 @@ function App() {
     methods.handleSubmit(onSubmit)()
   }
 
+  const handleImportConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target?.result as string
+      const config = JSON.parse(content) as SimulationConfig
+      methods.reset(config)
+      setActiveTab('token-setup')
+    }
+    reader.readAsText(file)
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -46,8 +67,25 @@ function App() {
                 Model token unlock schedules and market dynamics
               </p>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Powered by TokenLab
+            <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleImportConfig}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import Config
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Powered by TokenLab
+              </div>
             </div>
           </div>
         </div>
@@ -412,17 +450,360 @@ function AdvancedTab() {
   }
 
   return (
+    <div className="space-y-6">
+      <Tier2Forms />
+      {simulationMode === 'tier3' && <Tier3Forms />}
+    </div>
+  )
+}
+
+function Tier2Forms() {
+  const { register } = useFormContext<SimulationConfig>()
+
+  return (
     <Card>
       <CardHeader>
-        <CardTitle>Advanced Configuration - {simulationMode === 'tier2' ? 'Tier 2' : 'Tier 3'}</CardTitle>
+        <CardTitle>Tier 2: Dynamic Market Features</CardTitle>
         <CardDescription>
-          Configure advanced market dynamics and simulation parameters
+          Configure advanced market dynamics including staking, pricing, treasury, and volume
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-center py-8 text-muted-foreground">
-          Advanced tier configuration panel (Tier 2/3 features)
-        </div>
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="staking">
+            <AccordionTrigger>Dynamic Staking</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="staking-enabled"
+                    className="h-4 w-4"
+                    {...register('tier2.staking.enabled')}
+                  />
+                  <Label htmlFor="staking-enabled">
+                    Enable dynamic staking pool
+                  </Label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="staking-apy">APY</Label>
+                    <Input
+                      id="staking-apy"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.staking.apy', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staking-capacity">Max Capacity %</Label>
+                    <Input
+                      id="staking-capacity"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.staking.max_capacity_pct', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staking-lockup">Lockup Period (months)</Label>
+                    <Input
+                      id="staking-lockup"
+                      type="number"
+                      {...register('tier2.staking.lockup_months', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staking-participation">Participation Rate</Label>
+                    <Input
+                      id="staking-participation"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.staking.participation_rate', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staking-source">Reward Source</Label>
+                    <select
+                      id="staking-source"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      {...register('tier2.staking.reward_source')}
+                    >
+                      <option value="treasury">Treasury</option>
+                      <option value="emission">Token Emission</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="pricing">
+            <AccordionTrigger>Dynamic Pricing</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="pricing-enabled"
+                    className="h-4 w-4"
+                    {...register('tier2.pricing.enabled')}
+                  />
+                  <Label htmlFor="pricing-enabled">
+                    Enable dynamic pricing model
+                  </Label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pricing-model">Pricing Model</Label>
+                    <select
+                      id="pricing-model"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      {...register('tier2.pricing.pricing_model')}
+                    >
+                      <option value="bonding_curve">Bonding Curve</option>
+                      <option value="linear">Linear</option>
+                      <option value="constant">Constant</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pricing-initial">Initial Price</Label>
+                    <Input
+                      id="pricing-initial"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.pricing.initial_price', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pricing-target">Target Price (optional)</Label>
+                    <Input
+                      id="pricing-target"
+                      type="number"
+                      step="0.01"
+                      placeholder="Leave blank for dynamic"
+                      {...register('tier2.pricing.target_price', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pricing-param">Bonding Curve Parameter</Label>
+                    <Input
+                      id="pricing-param"
+                      type="number"
+                      step="0.1"
+                      {...register('tier2.pricing.bonding_curve_param', { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="treasury">
+            <AccordionTrigger>Treasury Strategy</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="treasury-enabled"
+                    className="h-4 w-4"
+                    {...register('tier2.treasury.enabled')}
+                  />
+                  <Label htmlFor="treasury-enabled">
+                    Enable treasury management
+                  </Label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="treasury-initial">Initial Balance %</Label>
+                    <Input
+                      id="treasury-initial"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.treasury.initial_balance_pct', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="treasury-hold">Hold %</Label>
+                    <Input
+                      id="treasury-hold"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.treasury.hold_pct', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="treasury-liquidity">Liquidity %</Label>
+                    <Input
+                      id="treasury-liquidity"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.treasury.liquidity_pct', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="treasury-buyback">Buyback %</Label>
+                    <Input
+                      id="treasury-buyback"
+                      type="number"
+                      step="0.01"
+                      {...register('tier2.treasury.buyback_pct', { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Note: Hold % + Liquidity % + Buyback % must equal 100%
+                </p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="volume">
+            <AccordionTrigger>Dynamic Volume</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="volume-enabled"
+                    className="h-4 w-4"
+                    {...register('tier2.volume.enabled')}
+                  />
+                  <Label htmlFor="volume-enabled">
+                    Enable dynamic volume calculation
+                  </Label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="volume-model">Volume Model</Label>
+                    <select
+                      id="volume-model"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      {...register('tier2.volume.volume_model')}
+                    >
+                      <option value="proportional">Proportional to Circulating Supply</option>
+                      <option value="constant">Constant</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="volume-base">Base Daily Volume</Label>
+                    <Input
+                      id="volume-base"
+                      type="number"
+                      {...register('tier2.volume.base_daily_volume', { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="volume-multiplier">Volume Multiplier</Label>
+                    <Input
+                      id="volume-multiplier"
+                      type="number"
+                      step="0.1"
+                      {...register('tier2.volume.volume_multiplier', { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Tier3Forms() {
+  const { register } = useFormContext<SimulationConfig>()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Tier 3: Monte Carlo & Cohort Modeling</CardTitle>
+        <CardDescription>
+          Configure stochastic simulation and cohort-based behavior modeling
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="monte-carlo">
+            <AccordionTrigger>Monte Carlo Simulation</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="mc-enabled"
+                    className="h-4 w-4"
+                    {...register('tier3.monte_carlo.enabled')}
+                  />
+                  <Label htmlFor="mc-enabled">
+                    Enable Monte Carlo simulation with multiple trials
+                  </Label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mc-trials">Number of Trials</Label>
+                    <Input
+                      id="mc-trials"
+                      type="number"
+                      {...register('tier3.monte_carlo.num_trials', { valueAsNumber: true })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Higher values increase accuracy but take longer (10-1000)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mc-variance">Variance Level</Label>
+                    <select
+                      id="mc-variance"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      {...register('tier3.monte_carlo.variance_level')}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mc-seed">Random Seed (optional)</Label>
+                    <Input
+                      id="mc-seed"
+                      type="number"
+                      placeholder="Leave blank for random"
+                      {...register('tier3.monte_carlo.seed', { valueAsNumber: true })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Set a seed for reproducible results
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="cohort">
+            <AccordionTrigger>Cohort Behavior Modeling</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="cohort-enabled"
+                    className="h-4 w-4"
+                    {...register('tier3.cohort_behavior.enabled')}
+                  />
+                  <Label htmlFor="cohort-enabled">
+                    Enable cohort-based behavior modeling
+                  </Label>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Cohort behavior profiles are predefined (high_stake, high_sell, balanced).
+                  Map buckets to cohorts to customize behavior patterns.
+                </p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   )
@@ -538,25 +919,87 @@ function ResultsTab({ simulation, isLoading, onRunSimulation }: ResultsTabProps)
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Simulation Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Execution Time</p>
-              <p className="font-medium">{simulation.execution_time_ms.toFixed(2)} ms</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Data Points</p>
-              <p className="font-medium">{simulation.data.bucket_results.length} rows</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold">Visualization & Analysis</h3>
+          <p className="text-sm text-muted-foreground">
+            Execution time: {simulation.execution_time_ms.toFixed(2)} ms |
+            Data points: {simulation.data.bucket_results.length} rows
+          </p>
+        </div>
+        <ExportButtons simulation={simulation} />
+      </div>
+
+      <UnlockScheduleChart data={simulation.data.bucket_results} />
+      <CirculatingSupplyChart data={simulation.data.global_metrics} />
+      <SellPressureChart data={simulation.data.global_metrics} />
+      <PriceEvolutionChart data={simulation.data.global_metrics} />
+      <StakingDynamicsChart data={simulation.data.global_metrics} />
     </div>
   )
+}
+
+interface ExportButtonsProps {
+  simulation: SimulationResponse
+}
+
+function ExportButtons({ simulation }: ExportButtonsProps) {
+  const { getValues } = useFormContext<SimulationConfig>()
+
+  const handleExportCSV = () => {
+    const bucketCSV = convertToCSV(simulation.data.bucket_results)
+    const globalCSV = convertToCSV(simulation.data.global_metrics)
+
+    downloadFile(bucketCSV, 'bucket_schedule.csv', 'text/csv')
+    downloadFile(globalCSV, 'global_metrics.csv', 'text/csv')
+  }
+
+  const handleExportJSON = () => {
+    const config = getValues()
+    const json = JSON.stringify(config, null, 2)
+    downloadFile(json, 'simulation_config.json', 'application/json')
+  }
+
+  return (
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm" onClick={handleExportCSV}>
+        <Download className="mr-2 h-4 w-4" />
+        Export CSV
+      </Button>
+      <Button variant="outline" size="sm" onClick={handleExportJSON}>
+        <Download className="mr-2 h-4 w-4" />
+        Export Config
+      </Button>
+    </div>
+  )
+}
+
+function convertToCSV(data: any[]): string {
+  if (data.length === 0) return ''
+
+  const headers = Object.keys(data[0])
+  const rows = data.map(row =>
+    headers.map(header => {
+      const value = row[header]
+      if (value === null || value === undefined) return ''
+      if (typeof value === 'string' && value.includes(',')) return `"${value}"`
+      return value
+    }).join(',')
+  )
+
+  return [headers.join(','), ...rows].join('\n')
+}
+
+function downloadFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 export default App
