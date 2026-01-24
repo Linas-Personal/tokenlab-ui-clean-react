@@ -49,17 +49,18 @@ class SimulatorService:
         df_bucket, df_global = simulator.run_simulation()
 
         # Convert DataFrames to Pydantic models
+        # Handle different column names between Tier 1 and Tier 2/3
         bucket_results = [
             BucketResult(
                 month_index=int(row["month_index"]),
                 date=row["date"],
                 bucket=row["bucket"],
-                allocation_tokens=float(row["allocation_tokens"]),
+                allocation_tokens=float(row.get("allocation_tokens") or row.get("allocation", 0)),
                 unlocked_this_month=float(row["unlocked_this_month"]),
                 unlocked_cumulative=float(row["unlocked_cumulative"]),
                 locked_remaining=float(row["locked_remaining"]),
-                sell_pressure_effective=float(row["sell_pressure_effective"]),
-                expected_sell_this_month=float(row["expected_sell_this_month"]),
+                sell_pressure_effective=float(row.get("sell_pressure_effective") or row.get("sell_pressure", 0)),
+                expected_sell_this_month=float(row.get("expected_sell_this_month") or row.get("expected_sell", 0)),
                 expected_circulating_cumulative=float(row["expected_circulating_cumulative"])
             )
             for row in df_bucket.to_dict(orient="records")
