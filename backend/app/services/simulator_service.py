@@ -82,14 +82,15 @@ class SimulatorService:
             for row in df_global.to_dict(orient="records")
         ]
 
+        # Handle None values for circ_X_pct (happens when horizon < X months)
         summary_cards = SummaryCards(
             max_unlock_tokens=float(simulator.summary_cards["max_unlock_tokens"]),
             max_unlock_month=int(simulator.summary_cards["max_unlock_month"]),
             max_sell_tokens=float(simulator.summary_cards["max_sell_tokens"]),
             max_sell_month=int(simulator.summary_cards["max_sell_month"]),
-            circ_12_pct=float(simulator.summary_cards["circ_12_pct"]),
-            circ_24_pct=float(simulator.summary_cards["circ_24_pct"]),
-            circ_end_pct=float(simulator.summary_cards["circ_end_pct"])
+            circ_12_pct=float(simulator.summary_cards["circ_12_pct"]) if simulator.summary_cards.get("circ_12_pct") is not None else None,
+            circ_24_pct=float(simulator.summary_cards["circ_24_pct"]) if simulator.summary_cards.get("circ_24_pct") is not None else None,
+            circ_end_pct=float(simulator.summary_cards["circ_end_pct"]) if simulator.summary_cards.get("circ_end_pct") is not None else None
         )
 
         return SimulationData(

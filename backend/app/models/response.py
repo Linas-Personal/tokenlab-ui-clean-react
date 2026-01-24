@@ -40,9 +40,9 @@ class SummaryCards(BaseModel):
     max_unlock_month: int
     max_sell_tokens: float
     max_sell_month: int
-    circ_12_pct: float
-    circ_24_pct: float
-    circ_end_pct: float
+    circ_12_pct: Optional[float] = None  # None if horizon < 12
+    circ_24_pct: Optional[float] = None  # None if horizon < 24
+    circ_end_pct: Optional[float] = None  # None if simulation fails
 
 
 class SimulationData(BaseModel):

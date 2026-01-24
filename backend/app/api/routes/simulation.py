@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/v1", tags=["simulation"])
 
 
 @router.post("/simulate", response_model=SimulateResponse)
-async def simulate(request: SimulateRequest) -> SimulateResponse:
+def simulate(request: SimulateRequest) -> SimulateResponse:
     """
     Run vesting simulation.
 
@@ -61,7 +61,7 @@ async def simulate(request: SimulateRequest) -> SimulateResponse:
 
 
 @router.post("/config/validate", response_model=ValidationResponse)
-async def validate_config(request: ValidateConfigRequest) -> ValidationResponse:
+def validate_config(request: ValidateConfigRequest) -> ValidationResponse:
     """
     Validate configuration without running simulation.
 

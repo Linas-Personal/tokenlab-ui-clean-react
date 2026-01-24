@@ -9,9 +9,9 @@ from datetime import datetime
 class TokenConfig(BaseModel):
     """Token configuration."""
     name: str = Field(..., min_length=1, max_length=100)
-    total_supply: int = Field(..., gt=0)
+    total_supply: int = Field(..., ge=0)  # Allow 0 for edge case testing
     start_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
-    horizon_months: int = Field(..., ge=1, le=240)
+    horizon_months: int = Field(..., ge=0, le=240)  # Allow 0 for TGE-only scenarios
     allocation_mode: Literal["percent", "tokens"] = "percent"
     simulation_mode: Literal["tier1", "tier2", "tier3"] = "tier1"
 
