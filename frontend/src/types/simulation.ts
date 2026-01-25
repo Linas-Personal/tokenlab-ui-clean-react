@@ -23,6 +23,22 @@ export interface GlobalMetric {
   staked_amount?: number
   liquidity_deployed?: number
   treasury_balance?: number
+
+  // Monte Carlo confidence bands (optional, only when Monte Carlo enabled)
+  total_unlocked_p10?: number
+  total_unlocked_p90?: number
+  total_unlocked_median?: number
+  total_unlocked_std?: number
+
+  total_expected_sell_p10?: number
+  total_expected_sell_p90?: number
+  total_expected_sell_median?: number
+  total_expected_sell_std?: number
+
+  expected_circulating_total_p10?: number
+  expected_circulating_total_p90?: number
+  expected_circulating_total_median?: number
+  expected_circulating_total_std?: number
 }
 
 export interface SummaryCards {

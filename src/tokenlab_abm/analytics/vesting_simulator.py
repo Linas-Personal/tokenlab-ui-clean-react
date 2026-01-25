@@ -1262,10 +1262,14 @@ class DynamicPricingController:
         elif model == "bonding_curve":
             elasticity = self.pricing_config.get("bonding_curve_param", 0.5)
             if circulating_supply == 0:
-                price = self.initial_price * 10
+                # At TGE (circulating = 0), just use initial price
+                price = self.initial_price
+                print(f"DEBUG: Month 0, circulating=0, price={price}, initial_price={self.initial_price}")
             else:
                 price = self.initial_price * (self.max_supply / circulating_supply) ** elasticity
                 price = max(0.01, min(price, self.initial_price * 100))
+                if circulating_supply < 1000:  # Only log early months
+                    print(f"DEBUG: circulating={circulating_supply}, max={self.max_supply}, price={price}, initial={self.initial_price}")
 
         else:
             price = self.initial_price
@@ -1500,12 +1504,21 @@ class MonteCarloRunner:
             return x.quantile(0.90)
         quantile_90.__name__ = "p90"
 
-        df_stats = df_combined.groupby("month_index").agg({
+        # Prepare aggregation dictionary with all numeric columns
+        agg_dict = {
             "total_unlocked": [quantile_10, "median", quantile_90, "mean", "std"],
             "total_expected_sell": [quantile_10, "median", quantile_90, "mean", "std"],
             "expected_circulating_total": [quantile_10, "median", quantile_90, "mean", "std"],
             "expected_circulating_pct": [quantile_10, "median", quantile_90, "mean", "std"],
-        })
+        }
+
+        # Add optional Tier 2/3 fields if they exist in the data
+        optional_fields = ["current_price", "staked_amount", "liquidity_deployed", "treasury_balance", "sell_volume_ratio"]
+        for field in optional_fields:
+            if field in df_combined.columns:
+                agg_dict[field] = ["mean"]  # Use mean for these fields (not distributions)
+
+        df_stats = df_combined.groupby("month_index").agg(agg_dict)
 
         # Flatten column names
         df_stats.columns = ["_".join(col).strip() for col in df_stats.columns.values]

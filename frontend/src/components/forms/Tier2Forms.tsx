@@ -1,12 +1,19 @@
-import { useFormContext } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Slider } from '@/components/ui/slider'
 import type { SimulationConfig } from '@/types/config'
 
 export function Tier2Forms() {
-  const { register } = useFormContext<SimulationConfig>()
+  const { register, control, setValue } = useFormContext<SimulationConfig>()
+
+  const bondingCurveParam = useWatch({
+    control,
+    name: 'tier2.pricing.bonding_curve_param',
+    defaultValue: 2.0
+  })
 
   return (
     <Card>
@@ -132,16 +139,30 @@ export function Tier2Forms() {
                       {...register('tier2.pricing.target_price', { valueAsNumber: true })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pricing-param">Bonding Curve Parameter</Label>
-                    <Input
-                      id="pricing-param"
-                      type="number"
-                      step="0.1"
-                      {...register('tier2.pricing.bonding_curve_param', { valueAsNumber: true })}
-                    />
-                  </div>
                 </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="pricing-elasticity">Price Elasticity (Bonding Curve)</Label>
+                    <span className="text-sm font-medium text-primary">{bondingCurveParam?.toFixed(1) || '2.0'}</span>
+                  </div>
+                  <Slider
+                    id="pricing-elasticity"
+                    min={0.1}
+                    max={5.0}
+                    step={0.1}
+                    value={[bondingCurveParam || 2.0]}
+                    onValueChange={(value) => setValue('tier2.pricing.bonding_curve_param', value[0])}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0.1 (Low elasticity)</span>
+                    <span>5.0 (High elasticity)</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Higher elasticity = larger price swings with supply changes. Formula: P = P₀ × (S_max / S_circ)^elasticity
+                  </p>
+                </div>
+              </div>
               </div>
             </AccordionContent>
           </AccordionItem>

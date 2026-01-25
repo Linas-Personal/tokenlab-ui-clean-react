@@ -35,22 +35,22 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   const liquidity = payload.find(p => p.dataKey === 'liquidity_deployed')
 
   return (
-    <div className="bg-background border rounded-lg shadow-lg p-3">
-      <p className="font-semibold mb-2">Month {label}</p>
+    <div className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg p-3">
+      <p className="font-semibold mb-2 text-slate-900 dark:text-slate-100">Month {label}</p>
       <div className="space-y-1">
         {staked && staked.value && (
-          <div className="flex items-center justify-between gap-4 text-sm">
+          <div className="flex items-center justify-between gap-4 text-sm text-slate-700 dark:text-slate-200">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: staked.color }} />
+              <div className="w-3 h-3 rounded bg-purple-500" />
               <span>Staked:</span>
             </div>
             <span className="font-medium">{formatTokens(staked.value)}</span>
           </div>
         )}
         {liquidity && liquidity.value && (
-          <div className="flex items-center justify-between gap-4 text-sm">
+          <div className="flex items-center justify-between gap-4 text-sm text-slate-700 dark:text-slate-200">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: liquidity.color }} />
+              <div className="w-3 h-3 rounded bg-cyan-500" />
               <span>Liquidity:</span>
             </div>
             <span className="font-medium">{formatTokens(liquidity.value)}</span>

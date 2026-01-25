@@ -33,6 +33,22 @@ class GlobalMetric(BaseModel):
     liquidity_deployed: Optional[float] = None
     treasury_balance: Optional[float] = None
 
+    # Monte Carlo statistics (optional, only present when MC is enabled)
+    total_unlocked_p10: Optional[float] = None
+    total_unlocked_p90: Optional[float] = None
+    total_unlocked_median: Optional[float] = None
+    total_unlocked_std: Optional[float] = None
+
+    total_expected_sell_p10: Optional[float] = None
+    total_expected_sell_p90: Optional[float] = None
+    total_expected_sell_median: Optional[float] = None
+    total_expected_sell_std: Optional[float] = None
+
+    expected_circulating_total_p10: Optional[float] = None
+    expected_circulating_total_p90: Optional[float] = None
+    expected_circulating_total_median: Optional[float] = None
+    expected_circulating_total_std: Optional[float] = None
+
 
 class SummaryCards(BaseModel):
     """Summary statistics for dashboard cards."""
