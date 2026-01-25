@@ -6,8 +6,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-  TooltipProps
+  ResponsiveContainer
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { GlobalMetric } from '@/types/simulation'
@@ -16,7 +15,16 @@ interface PriceEvolutionChartProps {
   data: GlobalMetric[]
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: Array<{
+    value: number
+    payload?: any
+  }>
+  label?: string | number
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length) return null
 
   const price = payload[0]?.value || 0

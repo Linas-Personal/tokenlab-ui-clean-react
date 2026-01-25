@@ -7,8 +7,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Area,
-  TooltipProps
+  Area
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { GlobalMetric } from '@/types/simulation'
@@ -18,7 +17,17 @@ interface CirculatingSupplyChartProps {
   data: GlobalMetric[]
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: Array<{
+    dataKey: string
+    value: number
+    color: string
+  }>
+  label?: string | number
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length) return null
 
   const tokens = payload.find(p => p.dataKey === 'expected_circulating_total')

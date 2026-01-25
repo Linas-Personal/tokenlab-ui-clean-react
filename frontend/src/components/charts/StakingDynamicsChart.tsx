@@ -7,8 +7,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-  TooltipProps
+  ResponsiveContainer
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { GlobalMetric } from '@/types/simulation'
@@ -18,7 +17,18 @@ interface StakingDynamicsChartProps {
   data: GlobalMetric[]
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: Array<{
+    dataKey: string
+    value: number
+    color: string
+    payload?: any
+  }>
+  label?: string | number
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length) return null
 
   const staked = payload.find(p => p.dataKey === 'staked_amount')
