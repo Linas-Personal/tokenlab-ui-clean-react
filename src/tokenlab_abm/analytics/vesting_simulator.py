@@ -1774,7 +1774,9 @@ class VestingSimulatorAdvanced(VestingSimulator):
                 "expected_circulating_pct": circulating_pct,
                 "sell_volume_ratio": sell_volume_ratio,
                 "current_price": self.vesting_economy.price if self.vesting_economy else 1.0,
-                "liquidity_deployed": liquidity_deployed
+                "staked_amount": self.vesting_economy.staking_capacity_used if self.vesting_economy else None,
+                "liquidity_deployed": liquidity_deployed,
+                "treasury_balance": self.treasury_controller.holdings if self.treasury_controller else None
             })
 
             # Advance economy iteration
