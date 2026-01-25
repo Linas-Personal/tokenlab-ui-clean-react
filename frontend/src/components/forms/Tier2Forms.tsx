@@ -163,7 +163,6 @@ export function Tier2Forms() {
                   </p>
                 </div>
               </div>
-              </div>
             </AccordionContent>
           </AccordionItem>
 
