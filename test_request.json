@@ -1,0 +1,25 @@
+{
+  "config": {
+    "token": {
+      "name": "TestToken",
+      "total_supply": 1000000,
+      "start_date": "2026-01-01",
+      "horizon_months": 12,
+      "allocation_mode": "percent",
+      "simulation_mode": "tier1"
+    },
+    "buckets": [
+      {
+        "bucket": "Team",
+        "allocation": 100,
+        "tge_unlock_pct": 0,
+        "cliff_months": 6,
+        "vesting_months": 12
+      }
+    ],
+    "assumptions": {
+      "sell_pressure_level": "medium"
+    },
+    "behaviors": {}
+  }
+}
