@@ -6,7 +6,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import type { SimulationConfig } from '@/types/config'
 
 export function Tier3Forms() {
-  const { register } = useFormContext<SimulationConfig>()
+  const { register, watch } = useFormContext<SimulationConfig>()
+  const buckets = watch('buckets') || []
+  const cohortEnabled = watch('tier3.cohort_behavior.enabled')
 
   return (
     <Card>
@@ -89,10 +91,39 @@ export function Tier3Forms() {
                     Enable cohort-based behavior modeling
                   </Label>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Cohort behavior profiles are predefined (high_stake, high_sell, balanced).
-                  Map buckets to cohorts to customize behavior patterns.
+                <p className="text-sm text-muted-foreground mb-4">
+                  Assign each bucket to a cohort profile to model different investor behaviors.
                 </p>
+
+                <div className="space-y-3">
+                  <Label>Bucket to Cohort Mapping</Label>
+                  <div className="border rounded-md divide-y">
+                    {buckets.map((bucket, index) => (
+                      <div key={index} className="p-3 flex items-center justify-between gap-4">
+                        <div className="font-medium text-sm min-w-[120px]">{bucket.bucket}</div>
+                        <select
+                          className="flex h-9 w-full max-w-[200px] rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-50"
+                          {...register(`tier3.cohort_behavior.bucket_cohort_mapping.${bucket.bucket}`)}
+                          disabled={!cohortEnabled}
+                        >
+                          <option value="">Default (balanced)</option>
+                          <option value="high_stake">High Stake (70% stake, 10% sell)</option>
+                          <option value="high_sell">High Sell (60% sell, 5% stake)</option>
+                          <option value="balanced">Balanced (30% stake, 25% sell)</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 p-4 bg-muted/50 rounded-md">
+                  <p className="text-sm font-semibold mb-2">Cohort Profiles:</p>
+                  <ul className="text-xs space-y-1 text-muted-foreground">
+                    <li><strong>High Stake:</strong> 70% staking probability, 10% sell pressure mean</li>
+                    <li><strong>High Sell:</strong> 5% staking probability, 60% sell pressure mean</li>
+                    <li><strong>Balanced:</strong> 30% staking probability, 25% sell pressure mean</li>
+                  </ul>
+                </div>
               </div>
             </AccordionContent>
           </AccordionItem>
