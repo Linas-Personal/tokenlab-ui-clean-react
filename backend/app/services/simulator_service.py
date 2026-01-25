@@ -46,7 +46,15 @@ class SimulatorService:
 
         # Run simulation
         simulator = SimulatorClass(config_dict, mode=mode)
-        df_bucket, df_global = simulator.run_simulation()
+
+        # Check if Monte Carlo is enabled (Tier 3 only)
+        if mode == "tier3" and config.tier3 and config.tier3.monte_carlo and config.tier3.monte_carlo.enabled:
+            num_trials = config.tier3.monte_carlo.num_trials
+            df_stats, df_all_trials = simulator.run_monte_carlo(num_trials=num_trials)
+            # Use aggregated statistics for the response
+            df_bucket, df_global = simulator.df_bucket_long, df_stats
+        else:
+            df_bucket, df_global = simulator.run_simulation()
 
         # Convert DataFrames to Pydantic models
         # Handle different column names between Tier 1 and Tier 2/3
@@ -66,22 +74,31 @@ class SimulatorService:
             for row in df_bucket.to_dict(orient="records")
         ]
 
-        global_metrics = [
-            GlobalMetric(
-                month_index=int(row["month_index"]),
-                date=row["date"],
-                total_unlocked=float(row["total_unlocked"]),
-                total_expected_sell=float(row["total_expected_sell"]),
-                expected_circulating_total=float(row["expected_circulating_total"]),
-                expected_circulating_pct=float(row["expected_circulating_pct"]),
-                sell_volume_ratio=float(row["sell_volume_ratio"]) if row.get("sell_volume_ratio") is not None else None,
-                current_price=float(row["current_price"]) if row.get("current_price") is not None else None,
-                staked_amount=float(row["staked_amount"]) if row.get("staked_amount") is not None else None,
-                liquidity_deployed=float(row["liquidity_deployed"]) if row.get("liquidity_deployed") is not None else None,
-                treasury_balance=float(row["treasury_balance"]) if row.get("treasury_balance") is not None else None
+        # Handle Monte Carlo statistics (use mean values, ignore confidence bands for now)
+        global_metrics = []
+        for row in df_global.to_dict(orient="records"):
+            # For Monte Carlo, columns are like "total_unlocked_mean", "total_unlocked_p10", etc.
+            # For regular sim, columns are just "total_unlocked"
+            total_unlocked = row.get("total_unlocked") or row.get("total_unlocked_mean", 0)
+            total_expected_sell = row.get("total_expected_sell") or row.get("total_expected_sell_mean", 0)
+            expected_circulating_total = row.get("expected_circulating_total") or row.get("expected_circulating_total_mean", 0)
+            expected_circulating_pct = row.get("expected_circulating_pct") or row.get("expected_circulating_pct_mean", 0)
+
+            global_metrics.append(
+                GlobalMetric(
+                    month_index=int(row["month_index"]),
+                    date=row.get("date", ""),  # Monte Carlo stats don't have date
+                    total_unlocked=float(total_unlocked),
+                    total_expected_sell=float(total_expected_sell),
+                    expected_circulating_total=float(expected_circulating_total),
+                    expected_circulating_pct=float(expected_circulating_pct),
+                    sell_volume_ratio=float(row["sell_volume_ratio"]) if row.get("sell_volume_ratio") is not None else None,
+                    current_price=float(row["current_price"]) if row.get("current_price") is not None else None,
+                    staked_amount=float(row["staked_amount"]) if row.get("staked_amount") is not None else None,
+                    liquidity_deployed=float(row["liquidity_deployed"]) if row.get("liquidity_deployed") is not None else None,
+                    treasury_balance=float(row["treasury_balance"]) if row.get("treasury_balance") is not None else None
+                )
             )
-            for row in df_global.to_dict(orient="records")
-        ]
 
         # Handle None values for circ_X_pct (happens when horizon < X months)
         summary_cards = SummaryCards(

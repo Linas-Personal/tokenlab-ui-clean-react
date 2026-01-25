@@ -49,6 +49,17 @@ def simulate(request: Request, sim_request: SimulateRequest) -> SimulateResponse
     logger.info(f"Starting simulation: mode={sim_request.config.token.simulation_mode}, "
                 f"horizon={sim_request.config.token.horizon_months} months")
 
+    # Debug logging - log key config parameters
+    logger.debug(f"Sell pressure level: {sim_request.config.assumptions.sell_pressure_level}")
+    logger.debug(f"Number of buckets: {len(sim_request.config.buckets)}")
+    logger.debug(f"Behaviors enabled: cliff_shock={sim_request.config.behaviors.cliff_shock.enabled}, "
+                 f"price_trigger={sim_request.config.behaviors.price_trigger.enabled}, "
+                 f"relock={sim_request.config.behaviors.relock.enabled}")
+    if sim_request.config.token.simulation_mode in ["tier2", "tier3"] and sim_request.config.tier2:
+        logger.debug(f"Tier2 enabled: staking={sim_request.config.tier2.staking.enabled}, "
+                     f"pricing={sim_request.config.tier2.pricing.enabled}, "
+                     f"treasury={sim_request.config.tier2.treasury.enabled}")
+
     try:
         simulation_data, warnings = SimulatorService.run_simulation(sim_request.config)
 

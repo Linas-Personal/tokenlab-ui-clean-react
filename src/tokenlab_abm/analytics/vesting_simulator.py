@@ -1492,8 +1492,13 @@ class MonteCarloRunner:
         df_combined = pd.concat(all_results, ignore_index=True)
 
         # Calculate statistics per month
-        quantile_10 = lambda x: x.quantile(0.10)
-        quantile_90 = lambda x: x.quantile(0.90)
+        def quantile_10(x):
+            return x.quantile(0.10)
+        quantile_10.__name__ = "p10"
+
+        def quantile_90(x):
+            return x.quantile(0.90)
+        quantile_90.__name__ = "p90"
 
         df_stats = df_combined.groupby("month_index").agg({
             "total_unlocked": [quantile_10, "median", quantile_90, "mean", "std"],
@@ -1505,6 +1510,14 @@ class MonteCarloRunner:
         # Flatten column names
         df_stats.columns = ["_".join(col).strip() for col in df_stats.columns.values]
         df_stats = df_stats.reset_index()
+
+        # Add date column (take from first trial)
+        first_trial = df_combined[df_combined["trial"] == 0]
+        if "date" in first_trial.columns:
+            date_mapping = first_trial.set_index("month_index")["date"].to_dict()
+            df_stats["date"] = df_stats["month_index"].map(date_mapping)
+        else:
+            df_stats["date"] = ""
 
         return df_stats, df_combined
 
