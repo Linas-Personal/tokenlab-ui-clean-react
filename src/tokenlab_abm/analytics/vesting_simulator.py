@@ -1248,19 +1248,19 @@ class DynamicPricingController:
         if not self.pricing_config.get("enabled", False):
             return self.initial_price
 
-        model = self.pricing_config.get("model", "constant")
+        model = self.pricing_config.get("pricing_model", "constant")
 
         if model == "constant":
             price = self.initial_price
 
         elif model == "linear":
-            elasticity = self.pricing_config.get("elasticity", 0.5)
+            elasticity = self.pricing_config.get("bonding_curve_param", 0.5)
             supply_ratio = circulating_supply / self.max_supply if self.max_supply > 0 else 0
             price = self.initial_price * (1 - elasticity * supply_ratio)
             price = max(0.01, price)
 
         elif model == "bonding_curve":
-            elasticity = self.pricing_config.get("elasticity", 0.5)
+            elasticity = self.pricing_config.get("bonding_curve_param", 0.5)
             if circulating_supply == 0:
                 price = self.initial_price * 10
             else:
