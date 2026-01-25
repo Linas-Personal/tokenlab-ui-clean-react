@@ -4,18 +4,22 @@ Health check API routes.
 import logging
 import time
 import psutil
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.models.response import HealthResponse
 
 router = APIRouter(prefix="/api/v1", tags=["health"])
 logger = logging.getLogger(__name__)
+limiter = Limiter(key_func=get_remote_address)
 
 # Track uptime
 _start_time = time.time()
 
 
 @router.get("/health", response_model=HealthResponse)
-def health_check() -> HealthResponse:
+@limiter.limit("60/minute")
+def health_check(request: Request) -> HealthResponse:
     """
     Health check endpoint with system metrics.
 

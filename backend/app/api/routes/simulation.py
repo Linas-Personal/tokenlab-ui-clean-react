@@ -2,9 +2,11 @@
 Simulation API routes.
 """
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import Any
 import time
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.models.request import SimulateRequest, ValidateConfigRequest
 from app.models.response import SimulateResponse, ValidationResponse, ErrorResponse
@@ -12,10 +14,25 @@ from app.services.simulator_service import SimulatorService
 
 router = APIRouter(prefix="/api/v1", tags=["simulation"])
 logger = logging.getLogger(__name__)
+limiter = Limiter(key_func=get_remote_address)
+
+
+# OPTIONS endpoints for CORS preflight requests
+@router.options("/simulate")
+async def simulate_options():
+    """Handle CORS preflight for simulate endpoint."""
+    return {"detail": "OK"}
+
+
+@router.options("/config/validate")
+async def validate_options():
+    """Handle CORS preflight for validate endpoint."""
+    return {"detail": "OK"}
 
 
 @router.post("/simulate", response_model=SimulateResponse)
-def simulate(request: SimulateRequest) -> SimulateResponse:
+@limiter.limit("20/minute")  # 20 per minute = allows reasonable testing while preventing abuse
+def simulate(request: Request, sim_request: SimulateRequest) -> SimulateResponse:
     """
     Run vesting simulation.
 
@@ -29,11 +46,11 @@ def simulate(request: SimulateRequest) -> SimulateResponse:
         HTTPException: If simulation fails
     """
     start_time = time.time()
-    logger.info(f"Starting simulation: mode={request.config.token.simulation_mode}, "
-                f"horizon={request.config.token.horizon_months} months")
+    logger.info(f"Starting simulation: mode={sim_request.config.token.simulation_mode}, "
+                f"horizon={sim_request.config.token.horizon_months} months")
 
     try:
-        simulation_data, warnings = SimulatorService.run_simulation(request.config)
+        simulation_data, warnings = SimulatorService.run_simulation(sim_request.config)
 
         execution_time_ms = (time.time() - start_time) * 1000
         logger.info(f"Simulation completed successfully in {execution_time_ms:.2f}ms, "
@@ -69,7 +86,8 @@ def simulate(request: SimulateRequest) -> SimulateResponse:
 
 
 @router.post("/config/validate", response_model=ValidationResponse)
-def validate_config(request: ValidateConfigRequest) -> ValidationResponse:
+@limiter.limit("30/minute")
+def validate_config(request: Request, config_request: ValidateConfigRequest) -> ValidationResponse:
     """
     Validate configuration without running simulation.
 
@@ -80,7 +98,7 @@ def validate_config(request: ValidateConfigRequest) -> ValidationResponse:
         Validation results with warnings and errors
     """
     logger.info("Config validation requested")
-    is_valid, warnings, errors = SimulatorService.validate_config_dict(request.config)
+    is_valid, warnings, errors = SimulatorService.validate_config_dict(config_request.config)
 
     if is_valid:
         logger.info(f"Config valid with {len(warnings)} warnings")
