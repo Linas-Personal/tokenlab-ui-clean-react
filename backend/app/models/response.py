@@ -71,6 +71,9 @@ class HealthResponse(BaseModel):
     """Response model for health check endpoint."""
     status: str
     version: str
+    uptime_seconds: Optional[int] = None
+    cpu_percent: Optional[float] = None
+    memory_percent: Optional[float] = None
 
 
 class ErrorResponse(BaseModel):

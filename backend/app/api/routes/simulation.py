@@ -1,6 +1,7 @@
 """
 Simulation API routes.
 """
+import logging
 from fastapi import APIRouter, HTTPException
 from typing import Any
 import time
@@ -10,6 +11,7 @@ from app.models.response import SimulateResponse, ValidationResponse, ErrorRespo
 from app.services.simulator_service import SimulatorService
 
 router = APIRouter(prefix="/api/v1", tags=["simulation"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/simulate", response_model=SimulateResponse)
@@ -27,11 +29,15 @@ def simulate(request: SimulateRequest) -> SimulateResponse:
         HTTPException: If simulation fails
     """
     start_time = time.time()
+    logger.info(f"Starting simulation: mode={request.config.token.simulation_mode}, "
+                f"horizon={request.config.token.horizon_months} months")
 
     try:
         simulation_data, warnings = SimulatorService.run_simulation(request.config)
 
         execution_time_ms = (time.time() - start_time) * 1000
+        logger.info(f"Simulation completed successfully in {execution_time_ms:.2f}ms, "
+                   f"warnings={len(warnings)}")
 
         return SimulateResponse(
             status="success",
@@ -41,6 +47,7 @@ def simulate(request: SimulateRequest) -> SimulateResponse:
         )
 
     except ValueError as e:
+        logger.warning(f"Validation error in simulation: {str(e)}")
         raise HTTPException(
             status_code=422,
             detail={
@@ -50,6 +57,7 @@ def simulate(request: SimulateRequest) -> SimulateResponse:
             }
         )
     except Exception as e:
+        logger.error(f"Simulation failed with exception: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail={
@@ -71,7 +79,13 @@ def validate_config(request: ValidateConfigRequest) -> ValidationResponse:
     Returns:
         Validation results with warnings and errors
     """
+    logger.info("Config validation requested")
     is_valid, warnings, errors = SimulatorService.validate_config_dict(request.config)
+
+    if is_valid:
+        logger.info(f"Config valid with {len(warnings)} warnings")
+    else:
+        logger.warning(f"Config invalid with {len(errors)} errors")
 
     return ValidationResponse(
         valid=is_valid,

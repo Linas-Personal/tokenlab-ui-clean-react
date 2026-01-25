@@ -1,21 +1,38 @@
 """
 Health check API routes.
 """
+import logging
+import time
+import psutil
 from fastapi import APIRouter
 from app.models.response import HealthResponse
 
 router = APIRouter(prefix="/api/v1", tags=["health"])
+logger = logging.getLogger(__name__)
+
+# Track uptime
+_start_time = time.time()
 
 
 @router.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
     """
-    Health check endpoint.
+    Health check endpoint with system metrics.
 
     Returns:
-        Health status
+        Health status with uptime and system metrics
     """
+    uptime_seconds = int(time.time() - _start_time)
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    memory = psutil.virtual_memory()
+
+    logger.debug(f"Health check: uptime={uptime_seconds}s, cpu={cpu_percent}%, "
+                 f"memory={memory.percent}%")
+
     return HealthResponse(
         status="healthy",
-        version="1.0.0"
+        version="1.0.0",
+        uptime_seconds=uptime_seconds,
+        cpu_percent=cpu_percent,
+        memory_percent=memory.percent
     )

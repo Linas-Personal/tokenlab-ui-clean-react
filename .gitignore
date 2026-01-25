@@ -58,3 +58,13 @@ gradio_cached_examples/
 
 # Logs
 *.log
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.*.local
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
