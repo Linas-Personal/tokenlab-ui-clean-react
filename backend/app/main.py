@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from app.api.routes import simulation, health
+from app.api.routes import simulation, health, abm_simulation
 from app.logging_config import setup_logging, get_logger
 
 # Configure logging with rotation
@@ -106,8 +106,47 @@ async def log_requests(request: Request, call_next):
 # Register routers
 app.include_router(simulation.router)
 app.include_router(health.router)
+app.include_router(abm_simulation.router)  # ABM simulation endpoints
 
 logger.info("Vesting Simulator API initialized")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize async components on startup."""
+    try:
+        # Initialize ABM job queue
+        from app.abm.async_engine.job_queue import AsyncJobQueue
+        from app.abm.async_engine.progress_streaming import ProgressStreamer
+
+        max_concurrent = int(os.getenv("ABM_MAX_CONCURRENT_JOBS", "5"))
+        job_ttl = int(os.getenv("ABM_JOB_TTL_HOURS", "24"))
+
+        app.state.abm_job_queue = AsyncJobQueue(
+            max_concurrent_jobs=max_concurrent,
+            job_ttl_hours=job_ttl
+        )
+        app.state.abm_job_queue.start_cleanup_task()
+
+        app.state.abm_progress_streamer = ProgressStreamer(app.state.abm_job_queue)
+
+        logger.info(
+            f"ABM job queue initialized: "
+            f"max_concurrent={max_concurrent}, ttl={job_ttl}h"
+        )
+    except Exception as e:
+        logger.error(f"Failed to initialize ABM components: {e}", exc_info=True)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    try:
+        if hasattr(app.state, "abm_job_queue"):
+            await app.state.abm_job_queue.shutdown()
+            logger.info("ABM job queue shutdown complete")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}", exc_info=True)
 
 
 @app.get("/")

@@ -1,0 +1,140 @@
+"""
+Pydantic request models for ABM API.
+"""
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Literal
+from enum import Enum
+
+
+class AgentGranularity(str, Enum):
+    """Agent creation strategy."""
+    FULL_INDIVIDUAL = "full_individual"  # 1:1 mapping (slow, most accurate)
+    ADAPTIVE = "adaptive"  # Adaptive based on total holders
+    META_AGENTS = "meta_agents"  # Fixed number of meta-agents (fast)
+
+
+class PricingModelEnum(str, Enum):
+    """Available pricing models."""
+    EOE = "eoe"
+    BONDING_CURVE = "bonding_curve"
+    ISSUANCE_CURVE = "issuance_curve"
+    CONSTANT = "constant"
+
+
+class AggregationLevel(str, Enum):
+    """Result aggregation level."""
+    COHORT = "cohort"  # Cohort-level only (small payload)
+    SAMPLED = "sampled"  # Sample of agents (medium)
+    FULL = "full"  # All agents (large!)
+
+
+class ABMConfig(BaseModel):
+    """ABM-specific configuration."""
+    # Agent settings
+    agent_granularity: AgentGranularity = AgentGranularity.ADAPTIVE
+    agents_per_cohort: int = Field(50, ge=10, le=1000, description="Agents per cohort (for adaptive/meta modes)")
+
+    # Pricing
+    pricing_model: PricingModelEnum = PricingModelEnum.EOE
+    pricing_config: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "initial_price": 1.0,
+            "holding_time": 6.0,
+            "smoothing_factor": 0.7
+        }
+    )
+
+    # Dynamic systems (Phase 3)
+    enable_staking: bool = False
+    staking_config: Optional[Dict[str, Any]] = None
+
+    enable_treasury: bool = False
+    treasury_config: Optional[Dict[str, Any]] = None
+
+    # Output settings
+    store_cohort_details: bool = True
+    aggregation_level: AggregationLevel = AggregationLevel.COHORT
+
+    # Random seed for reproducibility
+    seed: Optional[int] = None
+
+
+class CohortProfileOverride(BaseModel):
+    """Override default cohort profile parameters."""
+    sell_pressure_mean: Optional[float] = Field(None, ge=0, le=1.0)
+    sell_pressure_std: Optional[float] = Field(None, ge=0, le=0.5)
+    stake_probability: Optional[float] = Field(None, ge=0, le=1.0)
+    risk_tolerance_mean: Optional[float] = Field(None, ge=0, le=1.0)
+
+
+class MonteCarloConfig(BaseModel):
+    """Monte Carlo simulation configuration."""
+    enabled: bool = False
+    num_trials: int = Field(100, ge=10, le=1000)
+    variance_level: Literal["low", "medium", "high"] = "medium"
+
+
+class ABMSimulationRequest(BaseModel):
+    """
+    Complete ABM simulation request.
+
+    Reuses token and buckets from existing SimulationConfig,
+    adds ABM-specific parameters.
+    """
+    # Reuse existing config structure
+    token: Dict[str, Any]  # TokenConfig as dict
+    buckets: List[Dict[str, Any]]  # List of BucketConfig as dicts
+
+    # ABM-specific
+    abm: ABMConfig = Field(default_factory=ABMConfig)
+
+    # Optional cohort profile overrides
+    cohort_profiles: Optional[Dict[str, CohortProfileOverride]] = None
+
+    # Monte Carlo (Phase 6)
+    monte_carlo: Optional[MonteCarloConfig] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "token": {
+                    "name": "MyToken",
+                    "total_supply": 1000000000,
+                    "start_date": "2025-01-01",
+                    "horizon_months": 36
+                },
+                "buckets": [
+                    {
+                        "bucket": "Team",
+                        "allocation": 20,
+                        "tge_unlock_pct": 0,
+                        "cliff_months": 12,
+                        "vesting_months": 24
+                    },
+                    {
+                        "bucket": "VC",
+                        "allocation": 15,
+                        "tge_unlock_pct": 10,
+                        "cliff_months": 6,
+                        "vesting_months": 18
+                    },
+                    {
+                        "bucket": "Community",
+                        "allocation": 40,
+                        "tge_unlock_pct": 20,
+                        "cliff_months": 0,
+                        "vesting_months": 12
+                    }
+                ],
+                "abm": {
+                    "pricing_model": "eoe",
+                    "agents_per_cohort": 50,
+                    "store_cohort_details": True
+                }
+            }
+        }
+
+
+class ABMValidateRequest(BaseModel):
+    """Request for ABM config validation."""
+    config: ABMSimulationRequest

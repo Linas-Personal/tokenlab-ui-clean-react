@@ -120,4 +120,6 @@ export interface SimulationConfig {
   buckets: BucketConfig[]
   tier2?: Tier2Config
   tier3?: Tier3Config
+  abm?: any
+  monte_carlo?: any
 }
