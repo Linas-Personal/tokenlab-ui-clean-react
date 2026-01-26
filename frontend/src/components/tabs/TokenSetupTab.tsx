@@ -5,8 +5,7 @@ import { Label } from '@/components/ui/label'
 import type { SimulationConfig } from '@/types/config'
 
 export function TokenSetupTab() {
-  const { register, watch } = useFormContext<SimulationConfig>()
-  const simulationMode = watch('token.simulation_mode')
+  const { register } = useFormContext<SimulationConfig>()
 
   return (
     <Card>
@@ -57,31 +56,24 @@ export function TokenSetupTab() {
               <option value="tokens">Token Amounts</option>
             </select>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="simulation-mode">Simulation Tier</Label>
-            <select
-              id="simulation-mode"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              {...register('token.simulation_mode')}
-            >
-              <option value="tier1">Tier 1 - Basic Vesting</option>
-              <option value="tier2">Tier 2 - Dynamic Market</option>
-              <option value="tier3">Tier 3 - Monte Carlo</option>
-            </select>
-          </div>
         </div>
 
-        {simulationMode !== 'tier1' && (
-          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
-            <p className="text-sm text-blue-900 dark:text-blue-100">
-              {simulationMode === 'tier2' &&
-                'Tier 2 includes dynamic staking, pricing models, treasury strategies, and volume calculation.'}
-              {simulationMode === 'tier3' &&
-                'Tier 3 adds Monte Carlo simulation with multiple trials and cohort-based behavior modeling.'}
-            </p>
-          </div>
-        )}
+        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+            Agent-Based Modeling (ABM) Simulation
+          </h3>
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            This simulator uses an advanced Agent-Based Model where individual token holders are modeled
+            as agents with unique characteristics (risk tolerance, holding preferences, price sensitivity).
+            Configure agent behaviors, dynamic pricing, staking, and treasury in the ABM Config tab.
+            For advanced features like Monte Carlo simulations, see the Advanced tab.
+          </p>
+        </div>
+
+        <div className="hidden">
+          {/* Hidden field to maintain ABM as default simulation mode */}
+          <input type="hidden" {...register('token.simulation_mode')} value="abm" />
+        </div>
       </CardContent>
     </Card>
   )

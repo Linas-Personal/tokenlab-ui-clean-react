@@ -22,6 +22,12 @@ interface ABMConfigFormData {
       initial_price?: number
       alpha?: number
     }
+    enable_volume: boolean
+    volume_config: {
+      volume_model: 'proportional' | 'constant'
+      base_daily_volume: number
+      volume_multiplier: number
+    }
     enable_staking: boolean
     staking_config: {
       base_apy: number
@@ -40,6 +46,7 @@ interface ABMConfigFormData {
       buyback_pct: number
       burn_bought_tokens: boolean
     }
+    bucket_cohort_mapping: Record<string, string>
     initial_price: number
     seed: number | null
     store_cohort_details: boolean
@@ -47,6 +54,7 @@ interface ABMConfigFormData {
   monte_carlo: {
     enabled: boolean
     num_trials: number
+    variance_level: 'low' | 'medium' | 'high'
     seed: number | null
     confidence_levels: number[]
   }
@@ -68,6 +76,16 @@ export function ABMConfigForm() {
   const enableStaking = useWatch({
     name: 'abm.enable_staking',
     defaultValue: false
+  })
+
+  const enableVolume = useWatch({
+    name: 'abm.enable_volume',
+    defaultValue: false
+  })
+
+  const volumeModel = useWatch({
+    name: 'abm.volume_config.volume_model',
+    defaultValue: 'proportional'
   })
 
   const enableTreasury = useWatch({
@@ -272,6 +290,86 @@ export function ABMConfigForm() {
                       {pricingModel === 'constant' && 'Fixed price baseline for testing.'}
                     </AlertDescription>
                   </Alert>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="volume">
+              <AccordionTrigger>Dynamic Volume (Optional)</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="enable-volume"
+                      className="h-4 w-4"
+                      {...register('abm.enable_volume')}
+                    />
+                    <Label htmlFor="enable-volume">
+                      Enable dynamic transaction volume calculation
+                    </Label>
+                  </div>
+
+                  {enableVolume && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="volume-model">Volume Model</Label>
+                          <select
+                            id="volume-model"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            {...register('abm.volume_config.volume_model')}
+                          >
+                            <option value="proportional">Proportional (scales with supply)</option>
+                            <option value="constant">Constant (fixed)</option>
+                          </select>
+                          <p className="text-xs text-muted-foreground">
+                            {volumeModel === 'proportional' && 'Volume scales with circulating supply ratio'}
+                            {volumeModel === 'constant' && 'Fixed daily trading volume'}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="base-daily-volume">Base Daily Volume (tokens)</Label>
+                          <Input
+                            id="base-daily-volume"
+                            type="number"
+                            step="1000000"
+                            {...register('abm.volume_config.base_daily_volume', { valueAsNumber: true })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Base transaction volume in tokens
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="volume-multiplier">Volume Multiplier</Label>
+                          <Input
+                            id="volume-multiplier"
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            max="100"
+                            {...register('abm.volume_config.volume_multiplier', { valueAsNumber: true })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Adjustment factor (1.0 = baseline)
+                          </p>
+                        </div>
+                      </div>
+
+                      <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          {pricingModel === 'eoe' ? (
+                            <>Dynamic volume affects EOE pricing calculations. Proportional model scales volume with circulating supply growth.</>
+                          ) : (
+                            <>Dynamic volume is most relevant for EOE pricing model. Currently using {pricingModel}.</>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    </>
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -521,6 +619,22 @@ export function ABMConfigForm() {
                         </div>
 
                         <div className="space-y-2">
+                          <Label htmlFor="variance-level">Variance Level</Label>
+                          <select
+                            id="variance-level"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            {...register('monte_carlo.variance_level')}
+                          >
+                            <option value="low">Low (tight distributions)</option>
+                            <option value="medium">Medium (balanced)</option>
+                            <option value="high">High (wide distributions)</option>
+                          </select>
+                          <p className="text-xs text-muted-foreground">
+                            Controls variability in agent behavior sampling
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
                           <Label htmlFor="mc-seed">Random Seed (optional)</Label>
                           <Input
                             id="mc-seed"
@@ -540,6 +654,69 @@ export function ABMConfigForm() {
                       </Alert>
                     </>
                   )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="cohort-behavior">
+              <AccordionTrigger>Cohort Behavior Presets (Optional)</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4">
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Assign simplified behavioral profiles to your allocation buckets. Each preset defines
+                      agent characteristics like sell pressure, staking propensity, and risk tolerance.
+                      Leave unassigned to use default profiles based on bucket names.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium">Preset Profiles:</div>
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div className="p-3 border rounded-md bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                        <div className="font-semibold text-green-900 dark:text-green-100">Conservative</div>
+                        <div className="text-green-700 dark:text-green-300 mt-1">
+                          • Low sell pressure (10%)<br/>
+                          • High staking (60%)<br/>
+                          • Long hold time (12-24mo)
+                        </div>
+                      </div>
+                      <div className="p-3 border rounded-md bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                        <div className="font-semibold text-blue-900 dark:text-blue-100">Moderate</div>
+                        <div className="text-blue-700 dark:text-blue-300 mt-1">
+                          • Medium sell pressure (25%)<br/>
+                          • Medium staking (40%)<br/>
+                          • Medium hold time (6-12mo)
+                        </div>
+                      </div>
+                      <div className="p-3 border rounded-md bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                        <div className="font-semibold text-orange-900 dark:text-orange-100">Aggressive</div>
+                        <div className="text-orange-700 dark:text-orange-300 mt-1">
+                          • High sell pressure (40%)<br/>
+                          • Low staking (30%)<br/>
+                          • Short hold time (4-8mo)
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm">Bucket Assignments</Label>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Assign presets to your allocation buckets. Example: Team → Conservative, VC → Aggressive.
+                      These mappings override default bucket profiles.
+                    </p>
+
+                    <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                        Cohort behavior mapping requires bucket configuration in the Allocation tab.
+                        Assignments will be available after you define your token allocation buckets.
+                        This feature is currently in development - mappings will be configurable in a future update.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -596,6 +773,10 @@ export function ABMConfigForm() {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Initial Price:</span>
               <span className="font-semibold">${watch('abm.initial_price', 1.0)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Dynamic Volume:</span>
+              <span className="font-semibold">{enableVolume ? `${volumeModel}` : 'Disabled'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Staking Enabled:</span>
