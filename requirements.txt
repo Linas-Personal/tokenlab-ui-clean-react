@@ -14,3 +14,11 @@ seaborn==0.13.2
 # Testing
 pytest==9.0.2
 pytest-cov==7.0.0
+
+# Security patches (explicit pins for transitive dependencies)
+# Applied 2026-01-26 to address CVEs
+urllib3==2.6.3       # CVE-2025-66418, -66471, -50182, -50181
+requests==2.32.5     # CVE-2024-47081
+fonttools==4.61.1    # CVE-2025-66034
+pypdf==6.6.2         # Replacement for deprecated PyPDF2 (CVE-2023-36464)
+# nbconvert==7.16.6  # Latest available (CVE-2025-53000 fix pending in 7.16.7)

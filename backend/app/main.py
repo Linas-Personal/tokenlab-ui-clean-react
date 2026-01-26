@@ -1,9 +1,9 @@
 """
 FastAPI application main entry point.
 """
-import logging
-import sys
 import os
+import time
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,18 +11,17 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.api.routes import simulation, health
-import time
+from app.logging_config import setup_logging, get_logger
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('app.log')
-    ]
+# Configure logging with rotation
+log_file = Path(__file__).parent.parent / "logs" / "app.log"
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_file=str(log_file),
+    max_bytes=10 * 1024 * 1024,  # 10MB
+    backup_count=5
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Initialize rate limiter
 # Use env var to disable rate limiting in tests

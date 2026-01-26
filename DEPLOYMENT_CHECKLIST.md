@@ -225,7 +225,7 @@ Frontend uses caret (^) ranges - standard for npm, allows minor/patch updates
 
 Backend (Python):
 ```bash
-$ safety check --file requirements.txt
+$ safety scan --file requirements.txt
 
 Found and scanned 11 packages
 1 vulnerability reported
@@ -469,7 +469,7 @@ def health_check() -> HealthResponse:
    cd frontend && npm test -- --run
 
    # Security scan
-   safety check --file requirements.txt
+   safety scan --file requirements.txt
    cd frontend && npm audit
 
    # Create release tag

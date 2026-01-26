@@ -1264,12 +1264,9 @@ class DynamicPricingController:
             if circulating_supply == 0:
                 # At TGE (circulating = 0), just use initial price
                 price = self.initial_price
-                print(f"DEBUG: Month 0, circulating=0, price={price}, initial_price={self.initial_price}")
             else:
                 price = self.initial_price * (self.max_supply / circulating_supply) ** elasticity
                 price = max(0.01, min(price, self.initial_price * 100))
-                if circulating_supply < 1000:  # Only log early months
-                    print(f"DEBUG: circulating={circulating_supply}, max={self.max_supply}, price={price}, initial={self.initial_price}")
 
         else:
             price = self.initial_price
