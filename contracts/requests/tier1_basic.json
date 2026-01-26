@@ -1,0 +1,31 @@
+{
+  "token_name": "BasicToken",
+  "ticker": "BASIC",
+  "total_supply": 1000000000,
+  "launch_date": "2025-01-01",
+  "simulation_months": 36,
+  "tier": 1,
+  "buckets": [
+    {
+      "name": "Team",
+      "allocation_pct": 20.0,
+      "tge_unlock_pct": 0.0,
+      "cliff_months": 12,
+      "vesting_months": 36
+    },
+    {
+      "name": "Investors",
+      "allocation_pct": 30.0,
+      "tge_unlock_pct": 10.0,
+      "cliff_months": 6,
+      "vesting_months": 24
+    },
+    {
+      "name": "Community",
+      "allocation_pct": 50.0,
+      "tge_unlock_pct": 5.0,
+      "cliff_months": 0,
+      "vesting_months": 48
+    }
+  ]
+}

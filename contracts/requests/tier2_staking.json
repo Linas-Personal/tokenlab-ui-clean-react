@@ -1,0 +1,34 @@
+{
+  "token_name": "StakingToken",
+  "ticker": "STAKE",
+  "total_supply": 1000000000,
+  "launch_date": "2025-01-01",
+  "simulation_months": 60,
+  "tier": 2,
+  "buckets": [
+    {
+      "name": "Team",
+      "allocation_pct": 15.0,
+      "tge_unlock_pct": 0.0,
+      "cliff_months": 12,
+      "vesting_months": 48
+    },
+    {
+      "name": "Investors",
+      "allocation_pct": 25.0,
+      "tge_unlock_pct": 8.0,
+      "cliff_months": 6,
+      "vesting_months": 36
+    }
+  ],
+  "staking": {
+    "enabled": true,
+    "apy": 15.0,
+    "early_staking_boost": 1.2
+  },
+  "pricing": {
+    "enabled": true,
+    "initial_price": 0.10,
+    "price_impact_factor": 0.001
+  }
+}

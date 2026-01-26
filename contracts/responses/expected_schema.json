@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VestingSimulatorOutput",
+  "description": "Expected output schema from vesting simulator",
+  "type": "object",
+  "required": ["timeline", "summary", "charts"],
+  "properties": {
+    "timeline": {
+      "type": "object",
+      "description": "Time-series data for simulation",
+      "required": ["months", "dates"],
+      "properties": {
+        "months": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Month indices"
+        },
+        "dates": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Date strings"
+        },
+        "total_unlocked": {
+          "type": "array",
+          "items": {"type": "number"}
+        },
+        "circulating_supply": {
+          "type": "array",
+          "items": {"type": "number"}
+        },
+        "sell_pressure": {
+          "type": "array",
+          "items": {"type": "number"}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Aggregate statistics",
+      "properties": {
+        "total_supply": {"type": "number"},
+        "tge_unlock": {"type": "number"},
+        "tge_unlock_pct": {"type": "number"},
+        "max_circulating": {"type": "number"},
+        "avg_monthly_unlock": {"type": "number"}
+      }
+    },
+    "charts": {
+      "type": "object",
+      "description": "Chart data and metadata"
+    }
+  }
+}
