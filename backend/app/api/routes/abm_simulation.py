@@ -14,6 +14,7 @@ from app.models.abm_response import (
     JobSubmissionResponse, JobStatusResponse, JobStatus
 )
 from app.abm.engine.simulation_loop import ABMSimulationLoop
+from app.utils.config_migration import migrate_legacy_config, validate_migrated_config
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +53,32 @@ async def run_abm_simulation_sync(request: ABMSimulationRequest):
             "abm": request.abm.model_dump()
         }
 
+        # Handle legacy tier1/tier2/tier3 configs (backward compatibility)
+        migration_warnings = []
+        simulation_mode = config.get("token", {}).get("simulation_mode", "abm")
+        if simulation_mode in ["tier1", "tier2", "tier3"]:
+            logger.info(f"Migrating legacy config: {simulation_mode} -> abm")
+            config, migration_warnings = migrate_legacy_config(config)
+            recommendations = validate_migrated_config(config)
+
+            # Log migration details
+            for warning in migration_warnings:
+                logger.warning(f"Config migration: {warning}")
+            for rec in recommendations:
+                logger.info(f"Config recommendation: {rec}")
+
+            # Combine migration warnings and recommendations
+            migration_warnings.extend(recommendations)
+
         # Create simulation loop from config
         simulation_loop = ABMSimulationLoop.from_config(config)
 
         # Run simulation
         horizon_months = request.token.get("horizon_months", 12)
         results = await simulation_loop.run_full_simulation(months=horizon_months)
+
+        # Add migration warnings to results
+        results.warnings.extend(migration_warnings)
 
         # Convert to API response format
         api_response = _convert_to_api_response(results, simulation_loop)
@@ -115,6 +136,25 @@ async def submit_abm_simulation(request_obj: Request, config: ABMSimulationReque
             "buckets": config.buckets,
             "abm": config.abm.model_dump()
         }
+
+        # Handle legacy tier1/tier2/tier3 configs (backward compatibility)
+        simulation_mode = config_dict.get("token", {}).get("simulation_mode", "abm")
+        if simulation_mode in ["tier1", "tier2", "tier3"]:
+            logger.info(f"Migrating legacy config for async job: {simulation_mode} -> abm")
+            config_dict, migration_warnings = migrate_legacy_config(config_dict)
+            recommendations = validate_migrated_config(config_dict)
+
+            # Log migration details
+            for warning in migration_warnings:
+                logger.warning(f"Config migration (async): {warning}")
+            for rec in recommendations:
+                logger.info(f"Config recommendation (async): {rec}")
+
+            # Store migration warnings in config for job queue
+            if "_migration_warnings" not in config_dict:
+                config_dict["_migration_warnings"] = []
+            config_dict["_migration_warnings"].extend(migration_warnings)
+            config_dict["_migration_warnings"].extend(recommendations)
 
         # Submit job
         job_id = await job_queue.submit_job(config_dict)
