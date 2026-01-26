@@ -97,6 +97,102 @@ DEFAULT_COHORT_PROFILES = {
 }
 
 
+# Simplified cohort presets for UI (user-friendly naming)
+SIMPLE_COHORT_PRESETS = {
+    "conservative": CohortProfile(
+        risk_alpha=2, risk_beta=8,  # Low risk (mean ~0.2)
+        hold_time_shape=2, hold_time_scale=12,  # 12-24 month hold time
+        sell_pressure_mean=0.10, sell_pressure_std=0.03,  # Low selling (10%)
+        price_sensitivity_alpha=2, price_sensitivity_beta=8,  # Low price sensitivity
+        stake_alpha=6, stake_beta=4,  # High staking (60%)
+        cliff_shock_mult=1.5,
+        take_profit_threshold=0.5,
+        stop_loss_threshold=-0.3
+    ),
+    "moderate": CohortProfile(
+        risk_alpha=5, risk_beta=5,  # Moderate risk (mean ~0.5)
+        hold_time_shape=2, hold_time_scale=6,  # 6-12 month hold time
+        sell_pressure_mean=0.25, sell_pressure_std=0.08,  # Moderate selling (25%)
+        price_sensitivity_alpha=5, price_sensitivity_beta=5,  # Moderate sensitivity
+        stake_alpha=4, stake_beta=6,  # Moderate staking (40%)
+        cliff_shock_mult=2.0,
+        take_profit_threshold=0.5,
+        stop_loss_threshold=-0.3
+    ),
+    "aggressive": CohortProfile(
+        risk_alpha=5, risk_beta=3,  # High risk (mean ~0.625)
+        hold_time_shape=1.5, hold_time_scale=4,  # 4-8 month hold time
+        sell_pressure_mean=0.40, sell_pressure_std=0.10,  # High selling (40%)
+        price_sensitivity_alpha=6, price_sensitivity_beta=4,  # High sensitivity
+        stake_alpha=3, stake_beta=7,  # Low staking (30%)
+        cliff_shock_mult=3.0,
+        take_profit_threshold=0.5,
+        stop_loss_threshold=-0.3
+    )
+}
+
+
+def resolve_cohort_profile(bucket_name: str, mapping: Dict[str, str] = None) -> CohortProfile:
+    """
+    Resolve cohort profile from bucket name and optional mapping.
+
+    This function allows users to assign simplified cohort presets (conservative,
+    moderate, aggressive) to specific buckets, or fall back to default profiles
+    based on bucket names.
+
+    Priority order:
+    1. If mapping provided and bucket_name is in mapping, use the mapped preset
+    2. If bucket_name matches a DEFAULT_COHORT_PROFILES key, use that
+    3. Fall back to "Community" profile as ultimate default
+
+    Args:
+        bucket_name: Bucket name (e.g., "Team", "VC", "Community")
+        mapping: Optional dict mapping bucket names to simple presets
+                 (e.g., {"Team": "conservative", "VC": "aggressive"})
+
+    Returns:
+        Full CohortProfile instance
+
+    Examples:
+        >>> # Use simple preset
+        >>> profile = resolve_cohort_profile("Team", {"Team": "conservative"})
+
+        >>> # Use default profile by bucket name
+        >>> profile = resolve_cohort_profile("Team")  # Returns DEFAULT_COHORT_PROFILES["Team"]
+
+        >>> # Fall back to Community default
+        >>> profile = resolve_cohort_profile("NewBucket")  # Returns DEFAULT_COHORT_PROFILES["Community"]
+    """
+    mapping = mapping or {}
+
+    # Priority 1: Check if bucket has explicit simple preset mapping
+    if bucket_name in mapping:
+        preset_name = mapping[bucket_name]
+        if preset_name in SIMPLE_COHORT_PRESETS:
+            logger.info(
+                f"Cohort '{bucket_name}': Using simple preset '{preset_name}' "
+                f"(sell={SIMPLE_COHORT_PRESETS[preset_name].sell_pressure_mean:.2f}, "
+                f"stake={SIMPLE_COHORT_PRESETS[preset_name].stake_alpha/(SIMPLE_COHORT_PRESETS[preset_name].stake_alpha + SIMPLE_COHORT_PRESETS[preset_name].stake_beta):.2f})"
+            )
+            return SIMPLE_COHORT_PRESETS[preset_name]
+        else:
+            logger.warning(
+                f"Cohort '{bucket_name}': Unknown preset '{preset_name}', "
+                f"falling back to defaults"
+            )
+
+    # Priority 2: Check if bucket name matches default profile
+    if bucket_name in DEFAULT_COHORT_PROFILES:
+        logger.info(f"Cohort '{bucket_name}': Using default profile")
+        return DEFAULT_COHORT_PROFILES[bucket_name]
+
+    # Priority 3: Ultimate fallback to Community
+    logger.info(
+        f"Cohort '{bucket_name}': No specific profile found, using Community default"
+    )
+    return DEFAULT_COHORT_PROFILES["Community"]
+
+
 class AgentCohort:
     """
     Manages a cohort of agents with similar characteristics.

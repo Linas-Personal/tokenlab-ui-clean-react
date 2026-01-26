@@ -51,12 +51,25 @@ class EOEPricingController(ABMController):
         # Velocity = 12 / holding_time (annualized)
         self.velocity = 12.0 / self.holding_time
 
+        # Optional external volume controller
+        self.volume_controller = None
+
         logger.info(
             f"EOEPricing initialized: "
             f"holding_time={self.holding_time}m, "
             f"velocity={self.velocity:.2f}, "
             f"smoothing={self.smoothing_factor:.2f}"
         )
+
+    def set_volume_controller(self, volume_controller):
+        """
+        Set external volume controller for dynamic volume calculations.
+
+        Args:
+            volume_controller: VolumeController instance
+        """
+        self.volume_controller = volume_controller
+        logger.info("EOEPricing: External volume controller linked")
 
     async def execute(self) -> float:
         """
@@ -68,9 +81,15 @@ class EOEPricingController(ABMController):
         token_economy = self.get_dependency(TokenEconomy)
 
         # Transaction volume in fiat (demand side)
-        # This represents the total fiat value traded
-        # For now, we approximate as: sell_pressure * current_price
-        demand_fiat = token_economy.total_sell_pressure * token_economy.price
+        # If external volume controller exists, use it
+        # Otherwise, approximate as: sell_pressure * current_price
+        if self.volume_controller:
+            transaction_volume_tokens = await self.volume_controller.execute()
+            demand_fiat = transaction_volume_tokens * token_economy.price
+            logger.debug(f"Using external volume: {transaction_volume_tokens:,.0f} tokens")
+        else:
+            demand_fiat = token_economy.total_sell_pressure * token_economy.price
+            logger.debug(f"Using sell pressure for volume: {token_economy.total_sell_pressure:,.0f}")
 
         # Circulating supply
         supply = token_economy.circulating_supply

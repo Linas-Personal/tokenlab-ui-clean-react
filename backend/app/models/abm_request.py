@@ -51,6 +51,16 @@ class ABMConfig(BaseModel):
     enable_treasury: bool = False
     treasury_config: Optional[Dict[str, Any]] = None
 
+    # Volume configuration
+    enable_volume: bool = False
+    volume_config: Optional[VolumeConfig] = None
+
+    # Cohort behavior mapping (bucket name -> preset)
+    bucket_cohort_mapping: Optional[Dict[str, str]] = Field(
+        None,
+        description="Map bucket names to cohort presets (conservative, moderate, aggressive)"
+    )
+
     # Output settings
     store_cohort_details: bool = True
     aggregation_level: AggregationLevel = AggregationLevel.COHORT
@@ -67,11 +77,20 @@ class CohortProfileOverride(BaseModel):
     risk_tolerance_mean: Optional[float] = Field(None, ge=0, le=1.0)
 
 
+class VolumeConfig(BaseModel):
+    """Dynamic volume configuration."""
+    volume_model: Literal["proportional", "constant"] = "proportional"
+    base_daily_volume: float = Field(10_000_000, gt=0, description="Base daily trading volume in tokens")
+    volume_multiplier: float = Field(1.0, ge=0.1, le=100.0, description="Volume adjustment multiplier")
+
+
 class MonteCarloConfig(BaseModel):
     """Monte Carlo simulation configuration."""
     enabled: bool = False
     num_trials: int = Field(100, ge=10, le=1000)
     variance_level: Literal["low", "medium", "high"] = "medium"
+    seed: Optional[int] = Field(None, ge=0)
+    confidence_levels: List[int] = Field(default_factory=lambda: [10, 50, 90], description="Percentiles for confidence bands")
 
 
 class ABMSimulationRequest(BaseModel):

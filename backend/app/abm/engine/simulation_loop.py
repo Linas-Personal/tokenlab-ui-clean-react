@@ -65,6 +65,7 @@ class ABMSimulationLoop:
         pricing_controller: ABMController,
         staking_controller: Optional[ABMController] = None,
         treasury_controller: Optional[ABMController] = None,
+        volume_controller: Optional[ABMController] = None,
         start_date: datetime = None,
         store_cohort_details: bool = True
     ):
@@ -77,6 +78,7 @@ class ABMSimulationLoop:
             pricing_controller: Pricing model controller
             staking_controller: Optional staking pool controller
             treasury_controller: Optional treasury controller
+            volume_controller: Optional volume calculation controller
             start_date: Simulation start date
             store_cohort_details: Whether to store cohort-level breakdown
         """
@@ -85,6 +87,7 @@ class ABMSimulationLoop:
         self.pricing_controller = pricing_controller
         self.staking_controller = staking_controller
         self.treasury_controller = treasury_controller
+        self.volume_controller = volume_controller
         self.start_date = start_date or datetime.now()
         self.store_cohort_details = store_cohort_details
 
@@ -100,7 +103,8 @@ class ABMSimulationLoop:
             f"{len(agents)} agents, "
             f"pricing={pricing_controller.__class__.__name__}, "
             f"staking={staking_controller is not None}, "
-            f"treasury={treasury_controller is not None}"
+            f"treasury={treasury_controller is not None}, "
+            f"volume={volume_controller is not None}"
         )
 
     def _link_dependencies(self) -> None:
@@ -118,6 +122,9 @@ class ABMSimulationLoop:
 
         if self.treasury_controller:
             self.treasury_controller.link(TokenEconomy, self.token_economy)
+
+        if self.volume_controller:
+            self.volume_controller.link(TokenEconomy, self.token_economy)
 
         logger.debug("Dependencies linked")
 
@@ -278,7 +285,7 @@ class ABMSimulationLoop:
         Returns:
             ABMSimulationLoop instance
         """
-        from app.abm.agents.cohort import AgentCohort, DEFAULT_COHORT_PROFILES
+        from app.abm.agents.cohort import AgentCohort, DEFAULT_COHORT_PROFILES, resolve_cohort_profile
         from app.abm.dynamics.token_economy import TokenEconomy, TokenEconomyConfig
         from datetime import datetime
 
@@ -286,6 +293,9 @@ class ABMSimulationLoop:
         token_config = config["token"]
         buckets_config = config["buckets"]
         abm_config = config.get("abm", {})
+
+        # Get cohort mapping if provided
+        bucket_cohort_mapping = abm_config.get("bucket_cohort_mapping", {})
 
         # Create token economy
         token_economy = TokenEconomy(TokenEconomyConfig(
@@ -328,8 +338,8 @@ class ABMSimulationLoop:
             bucket_name = bucket["bucket"]
             allocation_pct = bucket["allocation"]
 
-            # Get cohort profile
-            profile = DEFAULT_COHORT_PROFILES.get(bucket_name, DEFAULT_COHORT_PROFILES["Community"])
+            # Get cohort profile (uses bucket_cohort_mapping if provided, else defaults)
+            profile = resolve_cohort_profile(bucket_name, bucket_cohort_mapping)
             cohort = AgentCohort(bucket_name, profile, seed=abm_config.get("seed"))
 
             # Get agent count and scaling weight
@@ -359,6 +369,30 @@ class ABMSimulationLoop:
             pricing_model,
             abm_config.get("pricing_config", {})
         )
+
+        # Create volume controller if enabled (for EOE pricing)
+        volume_controller = None
+        if abm_config.get("enable_volume", False):
+            from app.abm.dynamics.volume import VolumeController, VolumeConfigData
+
+            volume_config_dict = abm_config.get("volume_config", {})
+            volume_config = VolumeConfigData(
+                volume_model=volume_config_dict.get("volume_model", "proportional"),
+                base_daily_volume=volume_config_dict.get("base_daily_volume", 10_000_000),
+                volume_multiplier=volume_config_dict.get("volume_multiplier", 1.0)
+            )
+            volume_controller = VolumeController(volume_config)
+
+            # Link volume controller to EOE pricing if applicable
+            from app.abm.dynamics.pricing import EOEPricingController
+            if isinstance(pricing_controller, EOEPricingController):
+                pricing_controller.set_volume_controller(volume_controller)
+                logger.info("Volume controller linked to EOE pricing model")
+            else:
+                logger.warning(
+                    f"Volume controller enabled but pricing model is {pricing_model}, "
+                    f"not EOE. Volume controller will be ignored."
+                )
 
         # Create staking/treasury controllers (Phase 3)
         staking_controller = None
@@ -401,6 +435,7 @@ class ABMSimulationLoop:
             pricing_controller=pricing_controller,
             staking_controller=staking_controller,
             treasury_controller=treasury_controller,
+            volume_controller=volume_controller,
             start_date=start_date,
             store_cohort_details=abm_config.get("store_cohort_details", True)
         )
