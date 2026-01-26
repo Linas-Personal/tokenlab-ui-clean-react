@@ -90,6 +90,12 @@ export interface IssuanceCurvePricingConfig {
 
 export type PricingConfig = EOEPricingConfig | BondingCurvePricingConfig | IssuanceCurvePricingConfig | Record<string, never>;
 
+export interface VolumeConfig {
+  volume_model: "proportional" | "constant";
+  base_daily_volume: number;
+  volume_multiplier: number;
+}
+
 export interface CohortProfile {
   risk_alpha: number;
   risk_beta: number;
@@ -117,6 +123,9 @@ export interface ABMConfig {
   staking_config?: StakingConfig;
   enable_treasury: boolean;
   treasury_config?: TreasuryConfig;
+  enable_volume: boolean;
+  volume_config?: VolumeConfig;
+  bucket_cohort_mapping?: Record<string, string>;
   initial_price?: number;
   cohort_profiles?: Record<string, CohortProfile>;
   seed?: number;
@@ -124,11 +133,11 @@ export interface ABMConfig {
 }
 
 export interface MonteCarloConfig {
+  enabled: boolean;
   num_trials: number;
+  variance_level?: "low" | "medium" | "high";
   seed?: number;
   confidence_levels?: number[];
-  parallel_execution?: boolean;
-  max_workers?: number;
 }
 
 // ===========================
