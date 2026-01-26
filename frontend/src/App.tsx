@@ -1,17 +1,15 @@
 import { useState, useRef } from 'react'
 import { useForm, FormProvider } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
-import { Coins, Calendar, Settings, Rocket, BarChart3, Loader2, Upload, Sparkles } from 'lucide-react'
+import { Coins, Calendar, Settings, BarChart3, Loader2, Upload, Sparkles } from 'lucide-react'
 import { submitABMSimulation } from '@/lib/abm-api'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { DEFAULT_CONFIG } from '@/lib/constants'
-import { api } from '@/lib/api'
 import type { SimulationConfig } from '@/types/config'
 import { TokenSetupTab } from '@/components/tabs/TokenSetupTab'
 import { VestingScheduleTab } from '@/components/tabs/VestingScheduleTab'
 import { AssumptionsTab } from '@/components/tabs/AssumptionsTab'
-import { AdvancedTab } from '@/components/tabs/AdvancedTab'
 import { ResultsTab } from '@/components/tabs/ResultsTab'
 import { ABMTab } from '@/components/tabs/ABMTab'
 import { ABMResultsTab } from '@/components/tabs/ABMResultsTab'
@@ -23,13 +21,6 @@ function App() {
 
   const methods = useForm<SimulationConfig>({
     defaultValues: DEFAULT_CONFIG
-  })
-
-  const simulation = useMutation({
-    mutationFn: (config: SimulationConfig) => api.runSimulation(config),
-    onSuccess: () => {
-      setActiveTab('results')
-    }
   })
 
   const abmSimulation = useMutation({
@@ -46,10 +37,6 @@ function App() {
       setIsABMSimulating(false)
     }
   })
-
-  const onSubmit = (data: SimulationConfig) => {
-    simulation.mutate(data)
-  }
 
   const onABMSubmit = (data: any) => {
     const abmConfig = {
@@ -70,10 +57,6 @@ function App() {
       monte_carlo: data.monte_carlo?.enabled ? data.monte_carlo : undefined
     }
     abmSimulation.mutate(abmConfig)
-  }
-
-  const handleRunSimulation = () => {
-    methods.handleSubmit(onSubmit)()
   }
 
   const handleRunABMSimulation = () => {
@@ -132,7 +115,7 @@ function App() {
       <main className="container mx-auto px-6 py-8">
         <FormProvider {...methods}>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-7 mb-8">
+            <TabsList className="grid w-full grid-cols-6 mb-8">
               <TabsTrigger value="token-setup" className="flex items-center gap-2">
                 <Coins className="h-4 w-4" />
                 <span className="hidden sm:inline">Token Setup</span>
@@ -145,12 +128,8 @@ function App() {
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Assumptions</span>
               </TabsTrigger>
-              <TabsTrigger value="advanced" className="flex items-center gap-2">
-                <Rocket className="h-4 w-4" />
-                <span className="hidden sm:inline">Advanced</span>
-              </TabsTrigger>
               <TabsTrigger value="abm" className="flex items-center gap-2">
-                <Rocket className="h-4 w-4" />
+                <Sparkles className="h-4 w-4" />
                 <span className="hidden sm:inline">ABM Config</span>
               </TabsTrigger>
               <TabsTrigger value="results" className="flex items-center gap-2">
@@ -175,10 +154,6 @@ function App() {
               <AssumptionsTab />
             </TabsContent>
 
-            <TabsContent value="advanced">
-              <AdvancedTab />
-            </TabsContent>
-
             <TabsContent value="abm">
               <ABMTab />
             </TabsContent>
@@ -197,29 +172,11 @@ function App() {
           </Tabs>
         </FormProvider>
 
-        <div className="mt-8 flex justify-end gap-4">
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={handleRunSimulation}
-            disabled={simulation.isPending || isABMSimulating}
-          >
-            {simulation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Running Simulation...
-              </>
-            ) : (
-              <>
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Run Standard Simulation
-              </>
-            )}
-          </Button>
+        <div className="mt-8 flex justify-end">
           <Button
             size="lg"
             onClick={handleRunABMSimulation}
-            disabled={simulation.isPending || isABMSimulating}
+            disabled={isABMSimulating}
           >
             {isABMSimulating ? (
               <>

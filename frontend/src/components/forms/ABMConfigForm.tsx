@@ -9,6 +9,13 @@ import { Info, AlertTriangle } from 'lucide-react'
 import type { AgentGranularity, PricingModelEnum, RewardSource } from '@/types/abm'
 
 interface ABMConfigFormData {
+  buckets?: Array<{
+    bucket: string
+    allocation: number
+    tge_unlock_pct: number
+    cliff_months: number
+    vesting_months: number
+  }>
   abm: {
     agent_granularity: AgentGranularity
     agents_per_cohort: number
@@ -61,7 +68,7 @@ interface ABMConfigFormData {
 }
 
 export function ABMConfigForm() {
-  const { register, setValue, watch } = useFormContext<ABMConfigFormData>()
+  const { register, setValue, watch, getValues } = useFormContext<ABMConfigFormData>()
 
   const agentGranularity = useWatch({
     name: 'abm.agent_granularity',
@@ -108,6 +115,17 @@ export function ABMConfigForm() {
     defaultValue: 100
   })
 
+  // Watch buckets for cohort mapping
+  const buckets = useWatch({
+    name: 'buckets' as any,
+    defaultValue: []
+  })
+
+  const bucketCohortMapping = useWatch({
+    name: 'abm.bucket_cohort_mapping',
+    defaultValue: {}
+  })
+
   return (
     <div className="space-y-6">
       <Card>
@@ -130,32 +148,41 @@ export function ABMConfigForm() {
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       {...register('abm.agent_granularity')}
                     >
-                      <option value="adaptive">Adaptive (Recommended)</option>
-                      <option value="full_individual">Full Individual (&lt; 1K holders)</option>
-                      <option value="meta_agents">Meta Agents (&gt; 10K holders)</option>
+                      <option value="adaptive">Adaptive - Auto-selects based on holder count (Recommended)</option>
+                      <option value="full_individual">Full Individual - One agent per holder (most accurate, slowest)</option>
+                      <option value="meta_agents">Meta Agents - Representative sampling (fastest, good approximation)</option>
                     </select>
                     <p className="text-xs text-muted-foreground">
-                      {agentGranularity === 'adaptive' && 'Automatically selects strategy based on holder count'}
-                      {agentGranularity === 'full_individual' && 'Creates one agent per holder (slower, most accurate)'}
-                      {agentGranularity === 'meta_agents' && 'Each agent represents many holders (fastest)'}
+                      {agentGranularity === 'adaptive' && 'Automatically chooses full individual (<1K holders), representative sampling (1K-10K), or meta-agents (>10K) for optimal performance'}
+                      {agentGranularity === 'full_individual' && 'Creates one agent per token holder. Most accurate but slower for large holder counts. Best for <1,000 holders.'}
+                      {agentGranularity === 'meta_agents' && 'Each agent represents multiple holders with weighted actions. Fastest option, recommended for >10,000 holders.'}
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="agents-per-cohort">
-                      Agents Per Cohort: <span className="font-semibold">{agentsPerCohort}</span>
-                    </Label>
-                    <Slider
-                      id="agents-per-cohort"
-                      min={10}
-                      max={500}
-                      step={10}
-                      value={[agentsPerCohort]}
-                      onValueChange={(value) => setValue('abm.agents_per_cohort', value[0])}
-                      className="w-full"
-                    />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="agents-per-cohort">Agents Per Cohort</Label>
+                      <span className="text-sm font-semibold text-primary px-2 py-1 bg-primary/10 rounded">
+                        {agentsPerCohort}
+                      </span>
+                    </div>
+                    <div className="px-2">
+                      <Slider
+                        id="agents-per-cohort"
+                        min={10}
+                        max={500}
+                        step={10}
+                        value={[agentsPerCohort]}
+                        onValueChange={(value) => setValue('abm.agents_per_cohort', value[0])}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>10</span>
+                        <span>500</span>
+                      </div>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Number of agents to create per cohort (Team, VC, Community, etc.)
+                      Number of agents to create per cohort (Team, VC, Community, etc.). More agents = better accuracy but slower simulation.
                     </p>
                   </div>
 
@@ -600,19 +627,28 @@ export function ABMConfigForm() {
                   {monteCarloEnabled && (
                     <>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="num-trials">
-                            Number of Trials: <span className="font-semibold">{numTrials}</span>
-                          </Label>
-                          <Slider
-                            id="num-trials"
-                            min={10}
-                            max={500}
-                            step={10}
-                            value={[numTrials]}
-                            onValueChange={(value) => setValue('monte_carlo.num_trials', value[0])}
-                            className="w-full"
-                          />
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="num-trials">Number of Trials</Label>
+                            <span className="text-sm font-semibold text-primary px-2 py-1 bg-primary/10 rounded">
+                              {numTrials}
+                            </span>
+                          </div>
+                          <div className="px-2">
+                            <Slider
+                              id="num-trials"
+                              min={10}
+                              max={500}
+                              step={10}
+                              value={[numTrials]}
+                              onValueChange={(value) => setValue('monte_carlo.num_trials', value[0])}
+                              className="w-full"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                              <span>10</span>
+                              <span>500</span>
+                            </div>
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             More trials = better confidence bands but longer execution time
                           </p>
@@ -701,21 +737,55 @@ export function ABMConfigForm() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <Label className="text-sm">Bucket Assignments</Label>
                     <p className="text-xs text-muted-foreground mb-3">
-                      Assign presets to your allocation buckets. Example: Team → Conservative, VC → Aggressive.
-                      These mappings override default bucket profiles.
+                      Assign behavioral presets to your allocation buckets. These mappings override default bucket profiles.
                     </p>
 
-                    <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                        Cohort behavior mapping requires bucket configuration in the Allocation tab.
-                        Assignments will be available after you define your token allocation buckets.
-                        This feature is currently in development - mappings will be configurable in a future update.
-                      </AlertDescription>
-                    </Alert>
+                    {buckets && buckets.length > 0 ? (
+                      <div className="space-y-3 border rounded-md p-4 bg-muted/50">
+                        {buckets.map((bucket: any, index: number) => (
+                          <div key={index} className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <Label className="text-sm font-medium truncate block">
+                                {bucket.bucket || `Bucket ${index + 1}`}
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                {bucket.allocation}% allocation
+                              </p>
+                            </div>
+                            <div className="flex-1">
+                              <select
+                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                                value={bucketCohortMapping?.[bucket.bucket] || ''}
+                                onChange={(e) => {
+                                  const newMapping = { ...bucketCohortMapping }
+                                  if (e.target.value === '') {
+                                    delete newMapping[bucket.bucket]
+                                  } else {
+                                    newMapping[bucket.bucket] = e.target.value
+                                  }
+                                  setValue('abm.bucket_cohort_mapping', newMapping)
+                                }}
+                              >
+                                <option value="">Default (auto-detect)</option>
+                                <option value="conservative">Conservative</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="aggressive">Aggressive</option>
+                              </select>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                          No allocation buckets configured yet. Please add buckets in the Vesting Schedule tab to assign behavioral presets.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 </div>
               </AccordionContent>
