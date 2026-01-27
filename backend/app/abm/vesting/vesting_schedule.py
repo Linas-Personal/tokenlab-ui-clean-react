@@ -72,23 +72,37 @@ class VestingSchedule:
         Returns:
             Number of tokens that unlock this month
         """
+        unlock_amount = 0.0
+
+        # TGE unlock at month 0
         if month_index == 0:
-            # TGE month
-            return self.tge_amount
-        elif month_index < self.config.cliff_months:
-            # During cliff period, no unlock
+            unlock_amount += self.tge_amount
+
+            # If cliff is 0, first vesting also happens at month 0
+            if self.config.cliff_months == 0 and self.config.vesting_months > 0:
+                unlock_amount += self.monthly_unlock_rate
+
+            return unlock_amount
+
+        # During cliff period (after TGE), no unlock
+        if month_index < self.config.cliff_months:
             return 0.0
-        elif month_index == self.config.cliff_months:
-            # Cliff month: first vesting unlock
+
+        # After cliff period, calculate vesting unlocks
+        # For cliff=0: months 1, 2, 3... unlock vesting months 2, 3, 4...
+        # For cliff>0: month==cliff unlocks vesting month 1, then continue
+        if self.config.cliff_months == 0:
+            # Already unlocked month 1 at month 0, so month_index corresponds to vesting month (month_index + 1)
+            vesting_month_index = month_index  # month 1 -> vesting month 2 (0-indexed: month 1)
+        else:
+            # First unlock happens at cliff month (vesting month 1), then continue
+            vesting_month_index = month_index - self.config.cliff_months
+
+        if vesting_month_index < self.config.vesting_months:
             return self.monthly_unlock_rate
         else:
-            # Regular vesting period
-            months_since_cliff = month_index - self.config.cliff_months
-            if months_since_cliff < self.config.vesting_months:
-                return self.monthly_unlock_rate
-            else:
-                # Vesting complete
-                return 0.0
+            # Vesting complete
+            return 0.0
 
     def advance_month(self) -> float:
         """

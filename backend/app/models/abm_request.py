@@ -1,9 +1,48 @@
 """
 Pydantic request models for ABM API.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any, Literal
 from enum import Enum
+from datetime import date
+
+
+class TokenConfig(BaseModel):
+    """Token configuration with required fields."""
+    name: str = Field(..., min_length=1, description="Token name")
+    total_supply: float = Field(..., gt=0, description="Total token supply")
+    start_date: str = Field(..., description="Start date (YYYY-MM-DD format)")
+    horizon_months: int = Field(..., ge=1, le=240, description="Simulation horizon in months")
+    initial_price: Optional[float] = Field(1.0, gt=0, description="Initial token price")
+    simulation_mode: Optional[str] = Field("abm", description="Simulation mode")
+
+    @field_validator('start_date')
+    @classmethod
+    def validate_date_format(cls, v: str) -> str:
+        """Validate date is in YYYY-MM-DD format."""
+        try:
+            date.fromisoformat(v)
+            return v
+        except ValueError:
+            raise ValueError('start_date must be in YYYY-MM-DD format')
+
+
+class BucketConfig(BaseModel):
+    """Bucket (cohort) allocation configuration."""
+    bucket: str = Field(..., min_length=1, description="Bucket/cohort name")
+    allocation: float = Field(..., ge=0, le=100, description="Allocation percentage")
+    tge_unlock_pct: float = Field(..., ge=0, le=100, description="TGE unlock percentage")
+    cliff_months: int = Field(..., ge=0, description="Cliff period in months")
+    vesting_months: int = Field(..., ge=0, description="Vesting period in months")
+    num_holders: Optional[int] = Field(None, ge=1, description="Number of holders in this cohort")
+
+    @field_validator('allocation', 'tge_unlock_pct')
+    @classmethod
+    def validate_percentage(cls, v: float) -> float:
+        """Ensure percentages are valid."""
+        if v < 0 or v > 100:
+            raise ValueError('Percentage must be between 0 and 100')
+        return v
 
 
 class AgentGranularity(str, Enum):
@@ -32,7 +71,7 @@ class ABMConfig(BaseModel):
     """ABM-specific configuration."""
     # Agent settings
     agent_granularity: AgentGranularity = AgentGranularity.ADAPTIVE
-    agents_per_cohort: int = Field(50, ge=10, le=1000, description="Agents per cohort (for adaptive/meta modes)")
+    agents_per_cohort: int = Field(50, ge=1, le=1000, description="Agents per cohort (for adaptive/meta modes)")
 
     # Pricing
     pricing_model: PricingModelEnum = PricingModelEnum.EOE
@@ -100,9 +139,9 @@ class ABMSimulationRequest(BaseModel):
     Reuses token and buckets from existing SimulationConfig,
     adds ABM-specific parameters.
     """
-    # Reuse existing config structure
-    token: Dict[str, Any]  # TokenConfig as dict
-    buckets: List[Dict[str, Any]]  # List of BucketConfig as dicts
+    # Token and bucket configuration with validation
+    token: TokenConfig
+    buckets: List[BucketConfig]
 
     # ABM-specific
     abm: ABMConfig = Field(default_factory=ABMConfig)
@@ -112,6 +151,23 @@ class ABMSimulationRequest(BaseModel):
 
     # Monte Carlo (Phase 6)
     monte_carlo: Optional[MonteCarloConfig] = None
+
+    @field_validator('buckets')
+    @classmethod
+    def validate_buckets_not_empty(cls, v: List[BucketConfig]) -> List[BucketConfig]:
+        """Ensure at least one bucket is provided."""
+        if not v or len(v) == 0:
+            raise ValueError('At least one bucket must be provided')
+        return v
+
+    @field_validator('buckets')
+    @classmethod
+    def validate_allocation_total(cls, v: List[BucketConfig]) -> List[BucketConfig]:
+        """Validate that total allocation doesn't exceed 100%."""
+        total_allocation = sum(bucket.allocation for bucket in v)
+        if total_allocation > 100.01:  # Allow small floating point error
+            raise ValueError(f'Total allocation ({total_allocation}%) exceeds 100%')
+        return v
 
     class Config:
         json_schema_extra = {

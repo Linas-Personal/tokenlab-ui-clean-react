@@ -8,6 +8,12 @@ from app.abm.async_engine.job_queue import AsyncJobQueue
 from app.abm.async_engine.progress_streaming import ProgressStreamer
 
 
+# Configure pytest-anyio to only use asyncio backend
+@pytest.fixture(scope="session")
+def anyio_backend():
+    return "asyncio"
+
+
 @asynccontextmanager
 async def test_lifespan(app):
     """Lifespan context manager for tests - initializes job queue."""

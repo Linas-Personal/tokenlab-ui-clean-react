@@ -13,7 +13,7 @@ import asyncio
 from datetime import datetime
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_abm_simulation_basic():
     """Test basic ABM simulation with 3 cohorts."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop
@@ -122,7 +122,7 @@ async def test_abm_simulation_basic():
     print(f"  - Execution time: {results.execution_time_seconds:.2f}s")
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_abm_from_config():
     """Test creating ABM simulation from config dict."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop

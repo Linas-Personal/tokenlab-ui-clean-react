@@ -9,9 +9,10 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 import asyncio
+import pytest
 import time
 
-
+@pytest.mark.anyio
 async def test_monte_carlo_basic():
     """Test basic Monte Carlo simulation with small number of trials."""
     from app.abm.monte_carlo.parallel_mc import MonteCarloEngine
@@ -86,7 +87,7 @@ async def test_monte_carlo_basic():
 
     print("\n[OK] Basic Monte Carlo test passed")
 
-
+@pytest.mark.anyio
 async def test_monte_carlo_percentiles():
     """Test that percentiles are correctly ordered and within bounds."""
     from app.abm.monte_carlo.parallel_mc import MonteCarloEngine
@@ -145,7 +146,7 @@ async def test_monte_carlo_percentiles():
 
     print("\n[OK] Percentile ordering and bounds test passed")
 
-
+@pytest.mark.anyio
 async def test_monte_carlo_with_staking():
     """Test Monte Carlo with staking enabled."""
     from app.abm.monte_carlo.parallel_mc import MonteCarloEngine
@@ -206,7 +207,7 @@ async def test_monte_carlo_with_staking():
 
     print("\n[OK] Monte Carlo with staking test passed")
 
-
+@pytest.mark.anyio
 async def test_monte_carlo_with_treasury():
     """Test Monte Carlo with treasury enabled."""
     from app.abm.monte_carlo.parallel_mc import MonteCarloEngine
@@ -268,7 +269,7 @@ async def test_monte_carlo_with_treasury():
 
     print("\n[OK] Monte Carlo with treasury test passed")
 
-
+@pytest.mark.anyio
 async def test_monte_carlo_performance():
     """Benchmark Monte Carlo performance."""
     from app.abm.monte_carlo.parallel_mc import MonteCarloEngine

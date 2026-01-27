@@ -9,8 +9,9 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 import asyncio
+import pytest
 
-
+@pytest.mark.anyio
 async def test_volume_controller_proportional():
     """Test proportional volume model (scales with supply)."""
     from app.abm.dynamics.volume import VolumeController, VolumeConfigData
@@ -70,7 +71,7 @@ async def test_volume_controller_proportional():
 
     print("\n[OK] Proportional volume model working correctly!")
 
-
+@pytest.mark.anyio
 async def test_volume_controller_constant():
     """Test constant volume model (fixed)."""
     from app.abm.dynamics.volume import VolumeController, VolumeConfigData
@@ -110,7 +111,7 @@ async def test_volume_controller_constant():
     print(f"  Expected constant volume: {expected_volume:,.0f} tokens")
     print("\n[OK] Constant volume model working correctly!")
 
-
+@pytest.mark.anyio
 async def test_volume_multiplier():
     """Test volume multiplier effect."""
     from app.abm.dynamics.volume import VolumeController, VolumeConfigData
@@ -144,7 +145,7 @@ async def test_volume_multiplier():
 
     print("\n[OK] Volume multiplier working correctly!")
 
-
+@pytest.mark.anyio
 async def test_volume_with_eoe_pricing():
     """Test volume controller integration with EOE pricing model."""
     from app.abm.dynamics.volume import VolumeController, VolumeConfigData
@@ -197,7 +198,7 @@ async def test_volume_with_eoe_pricing():
 
     print("\n[OK] Volume integration with EOE pricing working correctly!")
 
-
+@pytest.mark.anyio
 async def test_simulation_with_volume_enabled():
     """Test full simulation with volume controller enabled."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop
@@ -342,7 +343,7 @@ def test_cohort_profile_resolution():
 
     print("\n[OK] Cohort profile resolution working correctly!")
 
-
+@pytest.mark.anyio
 async def test_simulation_with_cohort_mapping():
     """Test simulation with custom cohort behavior mapping."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop

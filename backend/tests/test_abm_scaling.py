@@ -9,9 +9,10 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 import asyncio
+import pytest
 import time
 
-
+@pytest.mark.anyio
 async def test_scaling_strategy_selection():
     """Test that scaling strategy is selected correctly based on holder count."""
     from app.abm.agents.scaling import AdaptiveAgentScaling, ScalingStrategy
@@ -28,7 +29,7 @@ async def test_scaling_strategy_selection():
 
     print("[OK] Strategy selection working correctly")
 
-
+@pytest.mark.anyio
 async def test_agent_count_calculation():
     """Test agent count calculation for different strategies."""
     from app.abm.agents.scaling import AdaptiveAgentScaling, ScalingStrategy
@@ -82,7 +83,7 @@ async def test_agent_count_calculation():
 
     print("\n[OK] Agent count calculation working correctly")
 
-
+@pytest.mark.anyio
 async def test_small_scale_simulation():
     """Test simulation with small supply (uses full individual if < 1K estimated holders)."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop
@@ -132,7 +133,7 @@ async def test_small_scale_simulation():
     assert len(simulation_loop.agents) < 10000, "Should not create excessive agents"
     print("\n[OK] Small scale simulation complete")
 
-
+@pytest.mark.anyio
 async def test_medium_scale_simulation():
     """Test simulation with 1K-10K holders (representative sampling)."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop
@@ -192,7 +193,7 @@ async def test_medium_scale_simulation():
 
     print("\n[OK] Medium scale simulation complete")
 
-
+@pytest.mark.anyio
 async def test_large_scale_simulation():
     """Test simulation with > 10K holders (meta-agents)."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop
@@ -365,7 +366,7 @@ async def benchmark_scaling_performance():
 
     print("\n[OK] Performance benchmark complete - all targets met!")
 
-
+@pytest.mark.anyio
 async def test_performance_estimates():
     """Test performance estimation function."""
     from app.abm.agents.scaling import AdaptiveAgentScaling

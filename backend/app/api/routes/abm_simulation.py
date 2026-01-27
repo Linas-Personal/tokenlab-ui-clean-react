@@ -34,13 +34,13 @@ async def run_abm_simulation_sync(request: ABMSimulationRequest):
         logger.info(
             f"ABM simulation request: "
             f"{len(request.buckets)} cohorts, "
-            f"{request.token.get('horizon_months', 12)} months, "
+            f"{request.token.horizon_months} months, "
             f"pricing={request.abm.pricing_model}"
         )
 
         config = {
-            "token": request.token,
-            "buckets": request.buckets,
+            "token": request.token.model_dump(),
+            "buckets": [bucket.model_dump() for bucket in request.buckets],
             "abm": request.abm.model_dump()
         }
 
@@ -60,7 +60,7 @@ async def run_abm_simulation_sync(request: ABMSimulationRequest):
 
         simulation_loop = ABMSimulationLoop.from_config(config)
 
-        horizon_months = request.token.get("horizon_months", 12)
+        horizon_months = request.token.horizon_months
         results = await simulation_loop.run_full_simulation(months=horizon_months)
 
         results.warnings.extend(migration_warnings)
@@ -93,8 +93,8 @@ async def submit_abm_simulation(
 ):
     try:
         config_dict = {
-            "token": config.token,
-            "buckets": config.buckets,
+            "token": config.token.model_dump(),
+            "buckets": [bucket.model_dump() for bucket in config.buckets],
             "abm": config.abm.model_dump()
         }
 

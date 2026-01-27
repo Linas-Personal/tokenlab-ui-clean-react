@@ -136,7 +136,7 @@ class ABMSimulationLoop:
 
         self.token_economy.total_sell_pressure = aggregated["total_sell"]
         self.token_economy.total_stake_pressure = aggregated["total_stake"]
-        self.token_economy.total_unlock_this_month = aggregated["total_sell"] + aggregated["total_stake"] + aggregated["total_hold"]
+        self.token_economy.total_unlock_this_month = aggregated["total_unlocked"]
 
         net_supply_change = aggregated["total_sell"] + aggregated["total_hold"]
         self.token_economy.update_circulating_supply(net_supply_change)
@@ -208,6 +208,7 @@ class ABMSimulationLoop:
         )
 
         agent_granularity = abm_config.get("agent_granularity", "adaptive")
+        agents_per_cohort = abm_config.get("agents_per_cohort", 50)
 
         if agent_granularity == "full_individual":
             forced_strategy = ScalingStrategy.FULL_INDIVIDUAL
@@ -216,14 +217,30 @@ class ABMSimulationLoop:
         else:
             forced_strategy = None
 
-        scaling = AdaptiveAgentScaling(strategy=forced_strategy)
+        scaling = AdaptiveAgentScaling(strategy=forced_strategy, agents_per_cohort=agents_per_cohort)
 
         holder_counts = get_holder_count_from_buckets(
             buckets_config,
             token_config["total_supply"]
         )
 
-        agent_counts = scaling.calculate_agent_counts(holder_counts)
+        # If agents_per_cohort is explicitly set and not using full_individual, use it directly
+        # Otherwise, use adaptive scaling
+        use_explicit_agent_count = (
+            "agents_per_cohort" in abm_config and
+            forced_strategy != ScalingStrategy.FULL_INDIVIDUAL
+        )
+
+        if use_explicit_agent_count:
+            # Use explicit agents_per_cohort for all cohorts
+            agent_counts = {
+                bucket["bucket"]: (agents_per_cohort, holder_counts.get(bucket["bucket"], agents_per_cohort) / agents_per_cohort)
+                for bucket in buckets_config
+            }
+            logger.info(f"Using explicit agents_per_cohort={agents_per_cohort} for all cohorts")
+        else:
+            agent_counts = scaling.calculate_agent_counts(holder_counts)
+
         all_agents = []
         for bucket in buckets_config:
             bucket_name = bucket["bucket"]
@@ -232,10 +249,7 @@ class ABMSimulationLoop:
             profile = resolve_cohort_profile(bucket_name, bucket_cohort_mapping)
             cohort = AgentCohort(bucket_name, profile, seed=abm_config.get("seed"))
 
-            num_agents, scaling_weight = agent_counts.get(
-                bucket_name,
-                (abm_config.get("agents_per_cohort", 50), 1.0)
-            )
+            num_agents, scaling_weight = agent_counts[bucket_name]
 
             total_allocation = (allocation_pct / 100.0) * token_config["total_supply"]
             actual_holder_count = holder_counts.get(bucket_name, num_agents)

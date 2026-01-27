@@ -9,8 +9,9 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 import asyncio
+import pytest
 
-
+@pytest.mark.anyio
 async def test_staking_and_treasury():
     """Test simulation with staking and treasury enabled."""
     from app.abm.engine.simulation_loop import ABMSimulationLoop
@@ -110,7 +111,7 @@ async def test_staking_and_treasury():
 
     print("\n[OK] All dynamic systems working correctly!")
 
-
+@pytest.mark.anyio
 async def test_variable_apy():
     """Test that staking APY varies with utilization."""
     from app.abm.dynamics.staking import StakingPool, StakingConfig
@@ -148,7 +149,7 @@ async def test_variable_apy():
 
     print("\n[OK] Variable APY working correctly!")
 
-
+@pytest.mark.anyio
 async def test_treasury_buyback_and_burn():
     """Test treasury buyback and burn functionality."""
     from app.abm.dynamics.treasury import TreasuryController, TreasuryConfig

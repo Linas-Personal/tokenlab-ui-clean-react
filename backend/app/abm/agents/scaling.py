@@ -42,16 +42,18 @@ class AdaptiveAgentScaling:
 
     # Configuration
     REPRESENTATIVE_SAMPLE_SIZE = 1000  # Sample size for representative sampling
-    META_AGENTS_PER_COHORT = 50  # Number of meta-agents per cohort
+    DEFAULT_META_AGENTS_PER_COHORT = 50  # Default number of meta-agents per cohort
 
-    def __init__(self, strategy: ScalingStrategy = None):
+    def __init__(self, strategy: ScalingStrategy = None, agents_per_cohort: int = None):
         """
         Initialize adaptive scaling.
 
         Args:
             strategy: Force specific strategy (None = auto-detect)
+            agents_per_cohort: Number of agents per cohort (for meta_agents strategy)
         """
         self.forced_strategy = strategy
+        self.meta_agents_per_cohort = agents_per_cohort if agents_per_cohort is not None else self.DEFAULT_META_AGENTS_PER_COHORT
 
     def determine_strategy(self, total_holders: int) -> ScalingStrategy:
         """
@@ -123,7 +125,7 @@ class AdaptiveAgentScaling:
         else:  # META_AGENTS
             # Fixed number of meta-agents per cohort
             for cohort, count in cohort_holder_counts.items():
-                num_agents = self.META_AGENTS_PER_COHORT
+                num_agents = self.meta_agents_per_cohort
                 scaling_weight = count / num_agents
                 result[cohort] = (num_agents, scaling_weight)
 
@@ -208,7 +210,7 @@ class AdaptiveAgentScaling:
             agent_count = cls.REPRESENTATIVE_SAMPLE_SIZE
         else:  # META_AGENTS
             # Assume 3 cohorts average
-            agent_count = cls.META_AGENTS_PER_COHORT * 3
+            agent_count = cls.DEFAULT_META_AGENTS_PER_COHORT * 3
 
         # Performance estimates (empirical)
         # Base: ~0.05ms per agent per iteration

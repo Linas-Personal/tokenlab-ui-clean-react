@@ -62,6 +62,7 @@ async def execute_agents_parallel(
                     sell_tokens=0.0,
                     stake_tokens=0.0,
                     hold_tokens=0.0,
+                    unlocked_tokens=0.0,
                     scaling_weight=agent.attrs.scaling_weight
                 )
 
@@ -86,17 +87,20 @@ def aggregate_agent_actions(actions: List[AgentAction]) -> dict:
     total_sell = 0.0
     total_stake = 0.0
     total_hold = 0.0
+    total_unlocked = 0.0
 
     for action in actions:
         # Apply scaling weight (for meta-agents)
         total_sell += action.sell_tokens * action.scaling_weight
         total_stake += action.stake_tokens * action.scaling_weight
         total_hold += action.hold_tokens * action.scaling_weight
+        total_unlocked += action.unlocked_tokens * action.scaling_weight
 
     return {
         "total_sell": total_sell,
         "total_stake": total_stake,
         "total_hold": total_hold,
+        "total_unlocked": total_unlocked,
         "num_agents": len(actions)
     }
 

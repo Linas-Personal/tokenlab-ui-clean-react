@@ -803,12 +803,12 @@ def test_abm_staking_at_max_capacity(client):
     assert response.status_code == 200
     data = response.json()
 
-    # Should have staking data
-    month_12 = next(m for m in data["global_metrics"] if m["month_index"] == 12)
-    assert "total_staked" in month_12
+    # Should have staking data (month_index 11 is the 12th month, 0-indexed)
+    month_11 = next(m for m in data["global_metrics"] if m["month_index"] == 11)
+    assert "total_staked" in month_11
     # Staked amount should not exceed max capacity
     max_capacity = 1_000_000 * 0.30
-    assert month_12["total_staked"] <= max_capacity * 1.01  # Small buffer for float precision
+    assert month_11["total_staked"] <= max_capacity * 1.01  # Small buffer for float precision
 
 
 def test_abm_treasury_with_zero_fees(client):

@@ -33,6 +33,7 @@ class AgentAction:
     sell_tokens: float
     stake_tokens: float
     hold_tokens: float
+    unlocked_tokens: float  # Tokens unlocked from vesting this month
     scaling_weight: float = 1.0
 
 
@@ -96,6 +97,7 @@ class TokenHolderAgent(ABMController):
             sell_tokens=sell_amount,
             stake_tokens=stake_amount,
             hold_tokens=self.unlocked_balance,
+            unlocked_tokens=newly_unlocked,
             scaling_weight=self.attrs.scaling_weight
         )
 
