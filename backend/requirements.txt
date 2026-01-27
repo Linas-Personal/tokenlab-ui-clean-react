@@ -2,7 +2,8 @@ fastapi==0.115.0
 uvicorn[standard]==0.32.1
 pydantic==2.10.5
 pydantic-settings==2.7.1
-python-multipart==0.0.20
+python-multipart==0.0.22  # CVE-2026-24486 fix
+starlette==0.47.2  # CVE-2024-47874, CVE-2025-54121 fixes
 numpy==2.2.6
 pandas==2.3.0
 matplotlib==3.10.3

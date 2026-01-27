@@ -26,6 +26,8 @@ def liveness_probe():
 @router.get("/health/ready")
 def readiness_probe(request: Request):
     """Kubernetes readiness probe - returns 200 if ready to serve traffic."""
+    from fastapi.responses import JSONResponse
+
     checks = {
         "job_queue": hasattr(request.app.state, "abm_job_queue"),
         "progress_streamer": hasattr(request.app.state, "abm_progress_streamer")
@@ -35,7 +37,10 @@ def readiness_probe(request: Request):
 
     if not all_ready:
         logger.warning(f"Readiness check failed: {checks}")
-        return {"status": "not_ready", "checks": checks}, 503
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "checks": checks}
+        )
 
     return {"status": "ready", "checks": checks}
 

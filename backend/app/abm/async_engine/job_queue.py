@@ -10,7 +10,7 @@ import time
 import hashlib
 import json
 from typing import Dict, Optional, Callable, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import logging
 
@@ -36,7 +36,7 @@ class JobInfo:
         self.job_id = job_id
         self.config = config
         self.status = JobStatus.PENDING
-        self.created_at = datetime.utcnow()
+        self.created_at = datetime.now(timezone.utc)
         self.started_at: Optional[datetime] = None
         self.completed_at: Optional[datetime] = None
 
@@ -110,7 +110,7 @@ class AsyncJobQueue:
 
     async def _cleanup_old_jobs(self):
         """Remove old completed/failed jobs."""
-        cutoff = datetime.utcnow() - timedelta(hours=self.job_ttl_hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=self.job_ttl_hours)
         jobs_to_remove = [
             job_id for job_id, job_info in self.jobs.items()
             if job_info.status in {JobStatus.COMPLETED, JobStatus.FAILED}
@@ -144,7 +144,7 @@ class AsyncJobQueue:
         # Check cache first
         config_hash = self._compute_config_hash(config)
         if config_hash in self.result_cache:
-            cache_age = datetime.utcnow() - self.cache_ttl[config_hash]
+            cache_age = datetime.now(timezone.utc) - self.cache_ttl[config_hash]
             if cache_age < timedelta(hours=2):
                 logger.info(f"Cache hit for config_hash={config_hash}")
 
@@ -152,8 +152,8 @@ class AsyncJobQueue:
                 job_id = f"cached_{uuid.uuid4().hex[:12]}"
                 job_info = JobInfo(job_id, config)
                 job_info.status = JobStatus.COMPLETED
-                job_info.started_at = datetime.utcnow()
-                job_info.completed_at = datetime.utcnow()
+                job_info.started_at = datetime.now(timezone.utc)
+                job_info.completed_at = datetime.now(timezone.utc)
                 job_info.progress_pct = 100.0
                 job_info.current_month = job_info.total_months
                 job_info.results = self.result_cache[config_hash]
@@ -244,7 +244,7 @@ class AsyncJobQueue:
         try:
             # Update status
             job_info.status = JobStatus.RUNNING
-            job_info.started_at = datetime.utcnow()
+            job_info.started_at = datetime.now(timezone.utc)
 
             logger.info(f"Job {job_id} started")
 
@@ -266,11 +266,11 @@ class AsyncJobQueue:
             # Store results
             job_info.results = results
             job_info.status = JobStatus.COMPLETED
-            job_info.completed_at = datetime.utcnow()
+            job_info.completed_at = datetime.now(timezone.utc)
 
             # Cache results
             self.result_cache[config_hash] = results
-            self.cache_ttl[config_hash] = datetime.utcnow()
+            self.cache_ttl[config_hash] = datetime.now(timezone.utc)
 
             elapsed = (job_info.completed_at - job_info.started_at).total_seconds()
             logger.info(
@@ -280,14 +280,14 @@ class AsyncJobQueue:
 
         except asyncio.CancelledError:
             job_info.status = JobStatus.CANCELLED
-            job_info.completed_at = datetime.utcnow()
+            job_info.completed_at = datetime.now(timezone.utc)
             logger.warning(f"Job {job_id} cancelled")
             raise
 
         except Exception as e:
             job_info.status = JobStatus.FAILED
             job_info.error = str(e)
-            job_info.completed_at = datetime.utcnow()
+            job_info.completed_at = datetime.now(timezone.utc)
             logger.error(f"Job {job_id} failed: {e}", exc_info=True)
 
     async def _run_monte_carlo_job(self, job_id: str, config: Dict[str, Any]):
@@ -303,7 +303,7 @@ class AsyncJobQueue:
         try:
             # Update status
             job_info.status = JobStatus.RUNNING
-            job_info.started_at = datetime.utcnow()
+            job_info.started_at = datetime.now(timezone.utc)
 
             mc_config = config["monte_carlo"]
             num_trials = mc_config.get("num_trials", 100)
@@ -332,7 +332,7 @@ class AsyncJobQueue:
             # Store results
             job_info.mc_results = mc_results
             job_info.status = JobStatus.COMPLETED
-            job_info.completed_at = datetime.utcnow()
+            job_info.completed_at = datetime.now(timezone.utc)
 
             elapsed = (job_info.completed_at - job_info.started_at).total_seconds()
             logger.info(
@@ -342,14 +342,14 @@ class AsyncJobQueue:
 
         except asyncio.CancelledError:
             job_info.status = JobStatus.CANCELLED
-            job_info.completed_at = datetime.utcnow()
+            job_info.completed_at = datetime.now(timezone.utc)
             logger.warning(f"Monte Carlo job {job_id} cancelled")
             raise
 
         except Exception as e:
             job_info.status = JobStatus.FAILED
             job_info.error = str(e)
-            job_info.completed_at = datetime.utcnow()
+            job_info.completed_at = datetime.now(timezone.utc)
             logger.error(f"Monte Carlo job {job_id} failed: {e}", exc_info=True)
 
     def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
