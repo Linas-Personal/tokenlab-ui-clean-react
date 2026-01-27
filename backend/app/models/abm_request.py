@@ -53,7 +53,7 @@ class ABMConfig(BaseModel):
 
     # Volume configuration
     enable_volume: bool = False
-    volume_config: Optional[VolumeConfig] = None
+    volume_config: Optional[Dict[str, Any]] = None
 
     # Cohort behavior mapping (bucket name -> preset)
     bucket_cohort_mapping: Optional[Dict[str, str]] = Field(

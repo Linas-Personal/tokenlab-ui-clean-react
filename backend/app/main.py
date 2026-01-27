@@ -1,6 +1,4 @@
-"""
-FastAPI application main entry point.
-"""
+"""FastAPI application main entry point."""
 import os
 import time
 from pathlib import Path
@@ -13,22 +11,19 @@ from slowapi.errors import RateLimitExceeded
 from app.api.routes import simulation, health, abm_simulation
 from app.logging_config import setup_logging, get_logger
 
-# Configure logging with rotation
 log_file = Path(__file__).parent.parent / "logs" / "app.log"
 setup_logging(
     level=os.getenv("LOG_LEVEL", "INFO"),
     log_file=str(log_file),
-    max_bytes=10 * 1024 * 1024,  # 10MB
+    max_bytes=10 * 1024 * 1024,
     backup_count=5
 )
 logger = get_logger(__name__)
-
-# Initialize rate limiter
-# Use env var to disable rate limiting in tests
 rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+default_limit = "1000/minute" if not rate_limit_enabled else "100/minute"
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["1000/minute"] if not rate_limit_enabled else ["100/minute"],
+    default_limits=[default_limit],
     enabled=rate_limit_enabled
 )
 
@@ -40,13 +35,8 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# CORS configuration
-# Can be configured via environment variable CORS_ORIGINS (comma-separated list)
-# Default to common dev ports if not specified
 cors_origins_str = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:3000"
@@ -63,14 +53,11 @@ app.add_middleware(
 
 logger.info(f"CORS configured for origins: {cors_origins}")
 
-# Request size limit middleware
-MAX_REQUEST_SIZE = int(os.getenv("MAX_REQUEST_SIZE", "10485760"))  # 10MB default
+MAX_REQUEST_SIZE = int(os.getenv("MAX_REQUEST_SIZE", "10485760"))
 
 @app.middleware("http")
 async def limit_request_size(request: Request, call_next):
-    """Limit request body size to prevent memory exhaustion."""
-    content_length = request.headers.get("content-length")
-    if content_length:
+    if content_length := request.headers.get("content-length"):
         content_length = int(content_length)
         if content_length > MAX_REQUEST_SIZE:
             logger.warning(f"Request too large: {content_length} bytes (max: {MAX_REQUEST_SIZE})")
@@ -82,14 +69,10 @@ async def limit_request_size(request: Request, call_next):
                     "message": f"Request body too large. Maximum allowed size is {MAX_REQUEST_SIZE} bytes."
                 }
             )
+    return await call_next(request)
 
-    response = await call_next(request)
-    return response
-
-# Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log all HTTP requests with timing."""
     start_time = time.time()
     logger.info(f"Request: {request.method} {request.url.path}")
 
@@ -103,44 +86,33 @@ async def log_requests(request: Request, call_next):
 
     return response
 
-# Register routers
 app.include_router(simulation.router)
 app.include_router(health.router)
-app.include_router(abm_simulation.router)  # ABM simulation endpoints
+app.include_router(abm_simulation.router)
 
 logger.info("Vesting Simulator API initialized")
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize async components on startup."""
     try:
-        # Initialize ABM job queue
         from app.abm.async_engine.job_queue import AsyncJobQueue
         from app.abm.async_engine.progress_streaming import ProgressStreamer
 
         max_concurrent = int(os.getenv("ABM_MAX_CONCURRENT_JOBS", "5"))
         job_ttl = int(os.getenv("ABM_JOB_TTL_HOURS", "24"))
 
-        app.state.abm_job_queue = AsyncJobQueue(
-            max_concurrent_jobs=max_concurrent,
-            job_ttl_hours=job_ttl
-        )
+        app.state.abm_job_queue = AsyncJobQueue(max_concurrent, job_ttl)
         app.state.abm_job_queue.start_cleanup_task()
-
         app.state.abm_progress_streamer = ProgressStreamer(app.state.abm_job_queue)
 
-        logger.info(
-            f"ABM job queue initialized: "
-            f"max_concurrent={max_concurrent}, ttl={job_ttl}h"
-        )
+        logger.info(f"ABM job queue initialized: max_concurrent={max_concurrent}, ttl={job_ttl}h")
     except Exception as e:
         logger.error(f"Failed to initialize ABM components: {e}", exc_info=True)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleanup on shutdown."""
     try:
         if hasattr(app.state, "abm_job_queue"):
             await app.state.abm_job_queue.shutdown()
@@ -151,7 +123,6 @@ async def shutdown_event():
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
     return JSONResponse(
         content={
             "message": "Vesting Simulator API",

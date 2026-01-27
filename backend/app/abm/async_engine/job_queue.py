@@ -81,30 +81,15 @@ class AsyncJobQueue:
     """
 
     def __init__(self, max_concurrent_jobs: int = 5, job_ttl_hours: int = 24):
-        """
-        Initialize job queue.
-
-        Args:
-            max_concurrent_jobs: Maximum concurrent running jobs
-            job_ttl_hours: Time-to-live for completed jobs (hours)
-        """
+        """Initialize job queue with concurrency limits and TTL."""
         self.max_concurrent_jobs = max_concurrent_jobs
         self.job_ttl_hours = job_ttl_hours
-
-        # Job storage
         self.jobs: Dict[str, JobInfo] = {}
-
-        # Result cache (config_hash -> results)
         self.result_cache: Dict[str, SimulationResults] = {}
         self.cache_ttl: Dict[str, datetime] = {}
-
-        # Cleanup task
         self.cleanup_task: Optional[asyncio.Task] = None
 
-        logger.info(
-            f"AsyncJobQueue initialized: "
-            f"max_concurrent={max_concurrent_jobs}, ttl={job_ttl_hours}h"
-        )
+        logger.info(f"AsyncJobQueue initialized: max_concurrent={max_concurrent_jobs}, ttl={job_ttl_hours}h")
 
     def start_cleanup_task(self):
         """Start background cleanup task."""
@@ -126,31 +111,20 @@ class AsyncJobQueue:
     async def _cleanup_old_jobs(self):
         """Remove old completed/failed jobs."""
         cutoff = datetime.utcnow() - timedelta(hours=self.job_ttl_hours)
-        jobs_to_remove = []
-
-        for job_id, job_info in self.jobs.items():
-            if job_info.status in [JobStatus.COMPLETED, JobStatus.FAILED]:
-                if job_info.completed_at and job_info.completed_at < cutoff:
-                    jobs_to_remove.append(job_id)
+        jobs_to_remove = [
+            job_id for job_id, job_info in self.jobs.items()
+            if job_info.status in {JobStatus.COMPLETED, JobStatus.FAILED}
+            and job_info.completed_at and job_info.completed_at < cutoff
+        ]
 
         for job_id in jobs_to_remove:
             del self.jobs[job_id]
-            logger.debug(f"Cleaned up old job: {job_id}")
 
         if jobs_to_remove:
             logger.info(f"Cleaned up {len(jobs_to_remove)} old jobs")
 
     def _compute_config_hash(self, config: Dict[str, Any]) -> str:
-        """
-        Compute deterministic hash of configuration for caching.
-
-        Args:
-            config: Configuration dictionary
-
-        Returns:
-            Hash string (16 chars)
-        """
-        # Sort keys for deterministic ordering
+        """Compute deterministic hash of configuration for caching."""
         config_json = json.dumps(config, sort_keys=True)
         return hashlib.sha256(config_json.encode()).hexdigest()[:16]
 

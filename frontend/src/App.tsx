@@ -159,11 +159,7 @@ function App() {
             </TabsContent>
 
             <TabsContent value="results">
-              <ResultsTab
-                simulation={simulation.data}
-                isLoading={simulation.isPending}
-                onRunSimulation={handleRunSimulation}
-              />
+              <ResultsTab />
             </TabsContent>
 
             <TabsContent value="abm-results">

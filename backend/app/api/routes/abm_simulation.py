@@ -1,10 +1,5 @@
-"""
-ABM Simulation API Routes.
-
-Phase 1: Synchronous simulation endpoint (for quick sims)
-Phase 2: Async job queue, SSE streaming, result caching
-"""
-from fastapi import APIRouter, HTTPException, Request
+"""ABM Simulation API Routes."""
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 import logging
 
@@ -21,23 +16,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v2/abm", tags=["abm"])
 
 
+def get_job_queue(request: Request):
+    if not hasattr(request.app.state, "abm_job_queue"):
+        raise HTTPException(status_code=503, detail="Job queue not initialized")
+    return request.app.state.abm_job_queue
+
+
+def get_progress_streamer(request: Request):
+    if not hasattr(request.app.state, "abm_progress_streamer"):
+        raise HTTPException(status_code=503, detail="Progress streaming not available")
+    return request.app.state.abm_progress_streamer
+
+
 @router.post("/simulate-sync", response_model=ABMSimulationResults)
 async def run_abm_simulation_sync(request: ABMSimulationRequest):
-    """
-    Run ABM simulation (Phase 1: Synchronous).
-
-    This is a simplified MVP endpoint that runs the simulation synchronously.
-    Phase 2 will add async job queue for long-running simulations.
-
-    Args:
-        request: ABM simulation configuration
-
-    Returns:
-        ABM simulation results
-
-    Raises:
-        HTTPException: If simulation fails
-    """
     try:
         logger.info(
             f"ABM simulation request: "
@@ -46,14 +38,12 @@ async def run_abm_simulation_sync(request: ABMSimulationRequest):
             f"pricing={request.abm.pricing_model}"
         )
 
-        # Convert request to config dict (for ABMSimulationLoop.from_config)
         config = {
             "token": request.token,
             "buckets": request.buckets,
             "abm": request.abm.model_dump()
         }
 
-        # Handle legacy tier1/tier2/tier3 configs (backward compatibility)
         migration_warnings = []
         simulation_mode = config.get("token", {}).get("simulation_mode", "abm")
         if simulation_mode in ["tier1", "tier2", "tier3"]:
@@ -61,26 +51,20 @@ async def run_abm_simulation_sync(request: ABMSimulationRequest):
             config, migration_warnings = migrate_legacy_config(config)
             recommendations = validate_migrated_config(config)
 
-            # Log migration details
             for warning in migration_warnings:
                 logger.warning(f"Config migration: {warning}")
             for rec in recommendations:
                 logger.info(f"Config recommendation: {rec}")
 
-            # Combine migration warnings and recommendations
             migration_warnings.extend(recommendations)
 
-        # Create simulation loop from config
         simulation_loop = ABMSimulationLoop.from_config(config)
 
-        # Run simulation
         horizon_months = request.token.get("horizon_months", 12)
         results = await simulation_loop.run_full_simulation(months=horizon_months)
 
-        # Add migration warnings to results
         results.warnings.extend(migration_warnings)
 
-        # Convert to API response format
         api_response = _convert_to_api_response(results, simulation_loop)
 
         logger.info(
@@ -103,63 +87,35 @@ async def run_abm_simulation_sync(request: ABMSimulationRequest):
 
 
 @router.post("/simulate", response_model=JobSubmissionResponse)
-async def submit_abm_simulation(request_obj: Request, config: ABMSimulationRequest):
-    """
-    Submit ABM simulation job (async, Phase 2).
-
-    Returns immediately with job_id. Use /jobs/{job_id}/status to poll
-    or /jobs/{job_id}/stream for real-time progress.
-
-    Args:
-        request_obj: FastAPI request object
-        config: ABM simulation configuration
-
-    Returns:
-        Job submission response with job_id and URLs
-
-    Raises:
-        HTTPException: If job submission fails
-    """
+async def submit_abm_simulation(
+    config: ABMSimulationRequest,
+    job_queue = Depends(get_job_queue)
+):
     try:
-        # Get job queue from app state
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(
-                status_code=503,
-                detail="Job queue not initialized. Using /simulate-sync instead."
-            )
-
-        job_queue = request_obj.app.state.abm_job_queue
-
-        # Convert to config dict
         config_dict = {
             "token": config.token,
             "buckets": config.buckets,
             "abm": config.abm.model_dump()
         }
 
-        # Handle legacy tier1/tier2/tier3 configs (backward compatibility)
         simulation_mode = config_dict.get("token", {}).get("simulation_mode", "abm")
         if simulation_mode in ["tier1", "tier2", "tier3"]:
             logger.info(f"Migrating legacy config for async job: {simulation_mode} -> abm")
             config_dict, migration_warnings = migrate_legacy_config(config_dict)
             recommendations = validate_migrated_config(config_dict)
 
-            # Log migration details
             for warning in migration_warnings:
                 logger.warning(f"Config migration (async): {warning}")
             for rec in recommendations:
                 logger.info(f"Config recommendation (async): {rec}")
 
-            # Store migration warnings in config for job queue
             if "_migration_warnings" not in config_dict:
                 config_dict["_migration_warnings"] = []
             config_dict["_migration_warnings"].extend(migration_warnings)
             config_dict["_migration_warnings"].extend(recommendations)
 
-        # Submit job
         job_id = await job_queue.submit_job(config_dict)
 
-        # Check if cached
         job_status = job_queue.get_job_status(job_id)
         is_cached = job_id.startswith("cached_")
 
@@ -177,7 +133,6 @@ async def submit_abm_simulation(request_obj: Request, config: ABMSimulationReque
         )
 
     except RuntimeError as e:
-        # Too many concurrent jobs
         raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
         logger.error(f"Job submission failed: {e}", exc_info=True)
@@ -188,25 +143,8 @@ async def submit_abm_simulation(request_obj: Request, config: ABMSimulationReque
 
 
 @router.get("/jobs/{job_id}/status", response_model=JobStatusResponse)
-async def get_job_status(request_obj: Request, job_id: str):
-    """
-    Get status of a submitted job.
-
-    Args:
-        request_obj: FastAPI request object
-        job_id: Job ID
-
-    Returns:
-        Job status response
-
-    Raises:
-        HTTPException: If job not found
-    """
+async def get_job_status(job_id: str, job_queue = Depends(get_job_queue)):
     try:
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(status_code=503, detail="Job queue not initialized")
-
-        job_queue = request_obj.app.state.abm_job_queue
         job_status = job_queue.get_job_status(job_id)
 
         if job_status is None:
@@ -229,27 +167,8 @@ async def get_job_status(request_obj: Request, job_id: str):
 
 
 @router.get("/jobs/{job_id}/results", response_model=ABMSimulationResults)
-async def get_job_results(request_obj: Request, job_id: str):
-    """
-    Get results of a completed job.
-
-    Args:
-        request_obj: FastAPI request object
-        job_id: Job ID
-
-    Returns:
-        Simulation results
-
-    Raises:
-        HTTPException: If job not found or not completed
-    """
+async def get_job_results(job_id: str, job_queue = Depends(get_job_queue)):
     try:
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(status_code=503, detail="Job queue not initialized")
-
-        job_queue = request_obj.app.state.abm_job_queue
-
-        # Check job status
         job_status = job_queue.get_job_status(job_id)
         if job_status is None:
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
@@ -260,14 +179,9 @@ async def get_job_results(request_obj: Request, job_id: str):
                 detail=f"Job not completed yet. Status: {job_status['status']}"
             )
 
-        # Get results
         results = job_queue.get_job_results(job_id)
         if results is None:
             raise HTTPException(status_code=404, detail="Results not available")
-
-        # Convert to API response format
-        # Need to create a mock simulation_loop to use _convert_to_api_response
-        # For now, we'll create a simplified response
         global_metrics = [
             ABMGlobalMetric(
                 month_index=r.month_index,
@@ -303,23 +217,11 @@ async def get_job_results(request_obj: Request, job_id: str):
 
 
 @router.get("/jobs/{job_id}/stream")
-async def stream_job_progress(request_obj: Request, job_id: str):
-    """
-    Stream real-time progress updates via Server-Sent Events (SSE).
-
-    Args:
-        request_obj: FastAPI request object
-        job_id: Job ID
-
-    Returns:
-        SSE stream
-    """
+async def stream_job_progress(
+    job_id: str,
+    progress_streamer = Depends(get_progress_streamer)
+):
     try:
-        if not hasattr(request_obj.app.state, "abm_progress_streamer"):
-            raise HTTPException(status_code=503, detail="Progress streaming not available")
-
-        progress_streamer = request_obj.app.state.abm_progress_streamer
-
         return StreamingResponse(
             progress_streamer.stream_job_progress(job_id),
             media_type="text/event-stream",
@@ -336,25 +238,8 @@ async def stream_job_progress(request_obj: Request, job_id: str):
 
 
 @router.delete("/jobs/{job_id}")
-async def cancel_job(request_obj: Request, job_id: str):
-    """
-    Cancel a running job.
-
-    Args:
-        request_obj: FastAPI request object
-        job_id: Job ID
-
-    Returns:
-        Success message
-
-    Raises:
-        HTTPException: If cancellation fails
-    """
+async def cancel_job(job_id: str, job_queue = Depends(get_job_queue)):
     try:
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(status_code=503, detail="Job queue not initialized")
-
-        job_queue = request_obj.app.state.abm_job_queue
         success = await job_queue.cancel_job(job_id)
 
         if not success:
@@ -373,21 +258,8 @@ async def cancel_job(request_obj: Request, job_id: str):
 
 
 @router.get("/jobs")
-async def list_jobs(request_obj: Request):
-    """
-    List all jobs (for monitoring/admin).
-
-    Args:
-        request_obj: FastAPI request object
-
-    Returns:
-        List of job statuses
-    """
+async def list_jobs(job_queue = Depends(get_job_queue)):
     try:
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(status_code=503, detail="Job queue not initialized")
-
-        job_queue = request_obj.app.state.abm_job_queue
         jobs = job_queue.get_all_jobs()
 
         return JSONResponse(content={"jobs": jobs})
@@ -398,21 +270,8 @@ async def list_jobs(request_obj: Request):
 
 
 @router.get("/queue/stats")
-async def get_queue_stats(request_obj: Request):
-    """
-    Get queue statistics.
-
-    Args:
-        request_obj: FastAPI request object
-
-    Returns:
-        Queue statistics
-    """
+async def get_queue_stats(job_queue = Depends(get_job_queue)):
     try:
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(status_code=503, detail="Job queue not initialized")
-
-        job_queue = request_obj.app.state.abm_job_queue
         stats = job_queue.get_stats()
 
         return JSONResponse(content=stats)
@@ -424,29 +283,17 @@ async def get_queue_stats(request_obj: Request):
 
 @router.post("/validate")
 async def validate_abm_config(request: ABMValidateRequest):
-    """
-    Validate ABM configuration without running simulation.
-
-    Args:
-        request: Configuration to validate
-
-    Returns:
-        Validation result with warnings/errors
-    """
     try:
         warnings = []
         errors = []
 
-        # Basic validation
         token = request.config.token
         buckets = request.config.buckets
 
-        # Check total allocation
         total_allocation = sum(b.get("allocation", 0) for b in buckets)
         if total_allocation > 100.01:
             errors.append(f"Total allocation ({total_allocation}%) exceeds 100%")
 
-        # Check agent count doesn't exceed reasonable limits
         agents_per_cohort = request.config.abm.agents_per_cohort
         num_cohorts = len(buckets)
         total_agents = agents_per_cohort * num_cohorts
@@ -457,7 +304,6 @@ async def validate_abm_config(request: ABMValidateRequest):
                 f"Consider using meta_agents granularity."
             )
 
-        # Check horizon
         horizon = token.get("horizon_months", 12)
         if horizon > 120:
             warnings.append(f"Very long horizon ({horizon} months) may be slow.")
@@ -483,36 +329,17 @@ async def validate_abm_config(request: ABMValidateRequest):
 
 
 @router.post("/monte-carlo/simulate", response_model=JobSubmissionResponse)
-async def submit_monte_carlo_simulation(request_obj: Request, config: ABMSimulationRequest):
-    """
-    Submit Monte Carlo simulation job (Phase 6).
-
-    Runs multiple ABM simulation trials with different random seeds in parallel.
-    Returns percentiles (P10, P50, P90) and confidence bands.
-
-    Args:
-        request_obj: FastAPI request object
-        config: ABM simulation configuration with monte_carlo settings
-
-    Returns:
-        Job submission response with job_id and URLs
-
-    Raises:
-        HTTPException: If job submission fails or monte_carlo config missing
-    """
+async def submit_monte_carlo_simulation(
+    config: ABMSimulationRequest,
+    job_queue = Depends(get_job_queue)
+):
     try:
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(status_code=503, detail="Job queue not initialized")
-
         if not config.monte_carlo:
             raise HTTPException(
                 status_code=400,
                 detail="Monte Carlo configuration is required. Please provide monte_carlo settings."
             )
 
-        job_queue = request_obj.app.state.abm_job_queue
-
-        # Submit Monte Carlo job
         job_id = await job_queue.submit_monte_carlo_job(config.model_dump())
 
         logger.info(
@@ -537,29 +364,8 @@ async def submit_monte_carlo_simulation(request_obj: Request, config: ABMSimulat
 
 
 @router.get("/monte-carlo/results/{job_id}")
-async def get_monte_carlo_results(request_obj: Request, job_id: str):
-    """
-    Get Monte Carlo simulation results.
-
-    Returns trials, percentiles (P10, P50, P90), mean trajectory, and summary stats.
-
-    Args:
-        request_obj: FastAPI request object
-        job_id: Job ID
-
-    Returns:
-        Monte Carlo results with percentiles and confidence bands
-
-    Raises:
-        HTTPException: If job not found or not completed
-    """
+async def get_monte_carlo_results(job_id: str, job_queue = Depends(get_job_queue)):
     try:
-        if not hasattr(request_obj.app.state, "abm_job_queue"):
-            raise HTTPException(status_code=503, detail="Job queue not initialized")
-
-        job_queue = request_obj.app.state.abm_job_queue
-
-        # Check job status
         job_status = job_queue.get_job_status(job_id)
         if job_status is None:
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
@@ -570,7 +376,6 @@ async def get_monte_carlo_results(request_obj: Request, job_id: str):
                 detail=f"Monte Carlo simulation not completed yet. Status: {job_status['status']}"
             )
 
-        # Get Monte Carlo results
         mc_results = job_queue.get_monte_carlo_results(job_id)
         if mc_results is None:
             raise HTTPException(
@@ -614,17 +419,6 @@ def _convert_to_api_response(
     results: "SimulationResults",
     simulation_loop: ABMSimulationLoop
 ) -> ABMSimulationResults:
-    """
-    Convert internal SimulationResults to API response format.
-
-    Args:
-        results: Internal simulation results
-        simulation_loop: Simulation loop instance
-
-    Returns:
-        ABMSimulationResults for API
-    """
-    # Convert global metrics
     global_metrics = [
         ABMGlobalMetric(
             month_index=r.month_index,
@@ -639,7 +433,6 @@ def _convert_to_api_response(
         for r in results.global_metrics
     ]
 
-    # Convert cohort metrics (if stored)
     cohort_metrics = None
     if results.global_metrics and results.global_metrics[0].cohort_results:
         cohort_metrics = []
@@ -655,10 +448,8 @@ def _convert_to_api_response(
                         num_agents=cohort_data["num_agents"]
                     ))
 
-    # Calculate summary statistics
     summary = _calculate_summary(global_metrics)
 
-    # Count unique cohorts
     cohorts_set = set()
     for agent in simulation_loop.agents:
         cohorts_set.add(agent.attrs.cohort)
@@ -676,46 +467,24 @@ def _convert_to_api_response(
 
 
 def _calculate_summary(metrics: list[ABMGlobalMetric]) -> ABMSummaryCards:
-    """
-    Calculate summary statistics from global metrics.
-
-    Args:
-        metrics: List of global metrics
-
-    Returns:
-        Summary cards
-    """
     if not metrics:
         return ABMSummaryCards(
-            max_sell_month=0,
-            max_sell_tokens=0.0,
-            final_price=0.0,
-            final_circulating_supply=0.0,
-            total_tokens_sold=0.0,
-            average_price=0.0
+            max_sell_month=0, max_sell_tokens=0.0, final_price=0.0,
+            final_circulating_supply=0.0, total_tokens_sold=0.0, average_price=0.0
         )
 
-    # Find max sell month
-    max_sell_month = max(metrics, key=lambda m: m.total_sold).month_index
-    max_sell_tokens = max(m.total_sold for m in metrics)
+    max_sell_month = max(metrics, key=lambda m: m.total_sold)
 
-    # Final values
-    final_metric = metrics[-1]
-    final_price = final_metric.price
-    final_circulating_supply = final_metric.circulating_supply
-
-    # Total sold (cumulative)
     total_tokens_sold = sum(m.total_sold for m in metrics)
-
-    # Average price (weighted by sell volume)
     total_sell_value = sum(m.total_sold * m.price for m in metrics)
-    average_price = total_sell_value / total_tokens_sold if total_tokens_sold > 0 else 0.0
+
+    final = metrics[-1]
 
     return ABMSummaryCards(
-        max_sell_month=max_sell_month,
-        max_sell_tokens=max_sell_tokens,
-        final_price=final_price,
-        final_circulating_supply=final_circulating_supply,
+        max_sell_month=max_sell_month.month_index,
+        max_sell_tokens=max_sell_month.total_sold,
+        final_price=final.price,
+        final_circulating_supply=final.circulating_supply,
         total_tokens_sold=total_tokens_sold,
-        average_price=average_price
+        average_price=total_sell_value / total_tokens_sold if total_tokens_sold > 0 else 0.0
     )

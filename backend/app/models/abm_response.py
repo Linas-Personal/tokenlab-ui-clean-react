@@ -3,6 +3,7 @@ Pydantic response models for ABM API.
 """
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from enum import Enum
 
 
 class ABMGlobalMetric(BaseModel):
