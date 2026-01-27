@@ -94,7 +94,8 @@ def aggregate_agent_actions(actions: List[AgentAction]) -> dict:
         total_sell += action.sell_tokens * action.scaling_weight
         total_stake += action.stake_tokens * action.scaling_weight
         total_hold += action.hold_tokens * action.scaling_weight
-        total_unlocked += action.unlocked_tokens * action.scaling_weight
+        # Unlocked tokens are already the actual amounts, don't scale them
+        total_unlocked += action.unlocked_tokens
 
     return {
         "total_sell": total_sell,

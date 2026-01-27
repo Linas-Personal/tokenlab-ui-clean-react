@@ -210,6 +210,15 @@ class ABMSimulationRequest(BaseModel):
         }
 
 
+class LenientABMConfig(BaseModel):
+    """Lenient ABM config for validation endpoint - accepts partial configs."""
+    token: Dict[str, Any]
+    buckets: List[Dict[str, Any]]
+    abm: ABMConfig = Field(default_factory=ABMConfig)
+    cohort_profiles: Optional[Dict[str, CohortProfileOverride]] = None
+    monte_carlo: Optional[MonteCarloConfig] = None
+
+
 class ABMValidateRequest(BaseModel):
     """Request for ABM config validation."""
-    config: ABMSimulationRequest
+    config: LenientABMConfig
