@@ -176,7 +176,7 @@ class SimulationConfig(BaseModel):
     token: TokenConfig
     assumptions: AssumptionsConfig = Field(default_factory=AssumptionsConfig)
     behaviors: BehaviorsConfig = Field(default_factory=BehaviorsConfig)
-    buckets: List[BucketConfig] = Field(..., min_length=1)
+    buckets: List[BucketConfig] = Field(..., min_length=1, max_length=1000)
     tier2: Optional[Tier2Config] = None
     tier3: Optional[Tier3Config] = None
 

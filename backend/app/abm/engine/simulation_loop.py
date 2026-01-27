@@ -161,6 +161,12 @@ class ABMSimulationLoop:
 
         current_date = self.start_date + timedelta(days=30 * month_index)
 
+        # Use actual staked amount from staking controller, not agent pressure
+        actual_total_staked = (
+            staking_metrics["total_staked"] if staking_metrics
+            else aggregated["total_stake"]
+        )
+
         result = IterationResult(
             month_index=month_index,
             date=current_date.strftime("%Y-%m-%d"),
@@ -168,7 +174,7 @@ class ABMSimulationLoop:
             circulating_supply=self.token_economy.circulating_supply,
             total_unlocked=self.token_economy.total_unlock_this_month,
             total_sold=aggregated["total_sell"],
-            total_staked=aggregated["total_stake"],
+            total_staked=actual_total_staked,
             total_held=aggregated["total_hold"],
             cohort_results=cohort_aggregated
         )

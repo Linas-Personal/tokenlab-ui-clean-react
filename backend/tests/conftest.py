@@ -30,8 +30,21 @@ async def test_lifespan(app):
 app.router.lifespan_context = test_lifespan
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def test_client():
-    """Test client with lifespan support."""
-    with TestClient(app) as client:
+    """Test client with lifespan support.
+
+    Uses function scope to ensure each test gets a fresh client
+    with clean middleware state (rate limiting, etc.).
+    """
+    # Reset rate limiter state before each test
+    from app.main import limiter
+    import random
+    limiter.reset()
+
+    # Create client with unique remote address to isolate rate limiting per test
+    with TestClient(app, base_url=f"http://test-{random.randint(1000000, 9999999)}.example.com") as client:
         yield client
+
+    # Clean up rate limiter state after test
+    limiter.reset()

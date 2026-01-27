@@ -17,9 +17,9 @@ import json
 from fastapi.testclient import TestClient
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def client(test_client):
-    """Use test_client fixture from conftest.py."""
+    """Use test_client fixture from conftest.py with function scope."""
     return test_client
 
 

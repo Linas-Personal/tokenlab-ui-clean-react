@@ -158,6 +158,8 @@ class ABMSimulationRequest(BaseModel):
         """Ensure at least one bucket is provided."""
         if not v or len(v) == 0:
             raise ValueError('At least one bucket must be provided')
+        if len(v) > 1000:
+            raise ValueError(f'Too many buckets ({len(v)}). Maximum allowed is 1000.')
         return v
 
     @field_validator('buckets')
