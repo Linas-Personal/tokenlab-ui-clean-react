@@ -17,15 +17,32 @@ limiter = Limiter(key_func=get_remote_address)
 _start_time = time.time()
 
 
+@router.get("/health/live")
+def liveness_probe():
+    """Kubernetes liveness probe - returns 200 if process is alive."""
+    return {"status": "alive"}
+
+
+@router.get("/health/ready")
+def readiness_probe(request: Request):
+    """Kubernetes readiness probe - returns 200 if ready to serve traffic."""
+    checks = {
+        "job_queue": hasattr(request.app.state, "abm_job_queue"),
+        "progress_streamer": hasattr(request.app.state, "abm_progress_streamer")
+    }
+
+    all_ready = all(checks.values())
+
+    if not all_ready:
+        logger.warning(f"Readiness check failed: {checks}")
+        return {"status": "not_ready", "checks": checks}, 503
+
+    return {"status": "ready", "checks": checks}
+
+
 @router.get("/health", response_model=HealthResponse)
 @limiter.limit("60/minute")
 def health_check(request: Request) -> HealthResponse:
-    """
-    Health check endpoint with system metrics.
-
-    Returns:
-        Health status with uptime and system metrics
-    """
     uptime_seconds = int(time.time() - _start_time)
     cpu_percent = psutil.cpu_percent(interval=0.1)
     memory = psutil.virtual_memory()

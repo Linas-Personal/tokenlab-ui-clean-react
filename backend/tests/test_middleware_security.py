@@ -15,14 +15,20 @@ import time
 from fastapi.testclient import TestClient
 from app.main import app
 
-client = TestClient(app)
+@pytest.fixture(scope="module")
+def client(test_client):
+    """Use test_client fixture from conftest.py."""
+    return test_client
+
+
+
 
 
 # =============================================================================
 # RATE LIMITING
 # =============================================================================
 
-def test_rate_limiting_allows_normal_requests():
+def test_rate_limiting_allows_normal_requests(client):
     """Test that rate limiting allows normal request patterns."""
     # Make 10 requests in quick succession (well under the limit)
     responses = []
@@ -34,7 +40,7 @@ def test_rate_limiting_allows_normal_requests():
     assert all(r.status_code == 200 for r in responses)
 
 
-def test_rate_limiting_blocks_excessive_requests():
+def test_rate_limiting_blocks_excessive_requests(client):
     """Test that rate limiting blocks requests exceeding the limit.
 
     Note: This test might be skipped in CI if RATE_LIMIT_ENABLED=false
@@ -57,7 +63,7 @@ def test_rate_limiting_blocks_excessive_requests():
     assert 429 in status_codes, "Expected at least one 429 (Too Many Requests) response"
 
 
-def test_rate_limiting_per_endpoint():
+def test_rate_limiting_per_endpoint(client):
     """Test that rate limiting is applied per endpoint."""
     # Requests to different endpoints should have separate limits
     endpoints = [
@@ -76,7 +82,7 @@ def test_rate_limiting_per_endpoint():
 # REQUEST SIZE LIMITS
 # =============================================================================
 
-def test_request_size_limit_accepts_normal_requests():
+def test_request_size_limit_accepts_normal_requests(client):
     """Test that normal-sized requests are accepted."""
     config = {
         "token": {
@@ -103,7 +109,7 @@ def test_request_size_limit_accepts_normal_requests():
     assert response.status_code == 200
 
 
-def test_request_size_limit_rejects_huge_requests():
+def test_request_size_limit_rejects_huge_requests(client):
     """Test that extremely large requests are rejected."""
     # Create a huge config by adding many buckets
     huge_config = {
@@ -134,7 +140,7 @@ def test_request_size_limit_rejects_huge_requests():
     assert response.status_code in [413, 422, 500]
 
 
-def test_request_size_with_large_allocation_data():
+def test_request_size_with_large_allocation_data(client):
     """Test request with very large bucket allocation arrays."""
     config = {
         "token": {
@@ -168,7 +174,7 @@ def test_request_size_with_large_allocation_data():
 # CORS HEADERS
 # =============================================================================
 
-def test_cors_allows_configured_origins():
+def test_cors_allows_configured_origins(client):
     """Test that CORS allows configured origins."""
     # Simulate request from allowed origin
     headers = {
@@ -181,7 +187,7 @@ def test_cors_allows_configured_origins():
     # Note: TestClient doesn't fully simulate CORS, but endpoint should work
 
 
-def test_cors_preflight_options_request():
+def test_cors_preflight_options_request(client):
     """Test CORS preflight OPTIONS request."""
     response = client.options("/api/v1/simulate")
 
@@ -193,7 +199,7 @@ def test_cors_preflight_options_request():
 # ERROR HANDLING MIDDLEWARE
 # =============================================================================
 
-def test_middleware_handles_404_gracefully():
+def test_middleware_handles_404_gracefully(client):
     """Test that middleware handles 404 errors properly."""
     response = client.get("/nonexistent/endpoint")
 
@@ -202,7 +208,7 @@ def test_middleware_handles_404_gracefully():
     assert "detail" in data
 
 
-def test_middleware_handles_405_method_not_allowed():
+def test_middleware_handles_405_method_not_allowed(client):
     """Test that middleware handles wrong HTTP methods."""
     # Try DELETE on an endpoint that only accepts GET
     response = client.delete("/api/v1/health")
@@ -210,7 +216,7 @@ def test_middleware_handles_405_method_not_allowed():
     assert response.status_code == 405
 
 
-def test_middleware_handles_malformed_json():
+def test_middleware_handles_malformed_json(client):
     """Test that middleware handles malformed JSON gracefully."""
     response = client.post(
         "/api/v1/simulate",
@@ -221,7 +227,7 @@ def test_middleware_handles_malformed_json():
     assert response.status_code == 422
 
 
-def test_middleware_handles_missing_content_type():
+def test_middleware_handles_missing_content_type(client):
     """Test requests without Content-Type header."""
     response = client.post(
         "/api/v1/simulate",
@@ -236,7 +242,7 @@ def test_middleware_handles_missing_content_type():
 # REQUEST LOGGING
 # =============================================================================
 
-def test_request_logging_includes_timing():
+def test_request_logging_includes_timing(client):
     """Test that request logging includes timing information.
 
     This test verifies the middleware works but doesn't check logs directly.
@@ -257,7 +263,7 @@ def test_request_logging_includes_timing():
 # CONCURRENT REQUESTS
 # =============================================================================
 
-def test_middleware_handles_concurrent_requests():
+def test_middleware_handles_concurrent_requests(client):
     """Test that middleware handles concurrent requests safely."""
     import concurrent.futures
 
@@ -274,7 +280,7 @@ def test_middleware_handles_concurrent_requests():
     assert all(code in [200, 429] for code in status_codes)
 
 
-def test_middleware_thread_safety_with_state():
+def test_middleware_thread_safety_with_state(client):
     """Test thread safety of middleware accessing app state."""
     import concurrent.futures
 
@@ -318,14 +324,14 @@ def test_middleware_thread_safety_with_state():
 # EDGE CASES
 # =============================================================================
 
-def test_middleware_handles_empty_request_body():
+def test_middleware_handles_empty_request_body(client):
     """Test handling of empty request body."""
     response = client.post("/api/v1/simulate")
 
     assert response.status_code == 422
 
 
-def test_middleware_handles_null_json():
+def test_middleware_handles_null_json(client):
     """Test handling of null JSON."""
     response = client.post(
         "/api/v1/simulate",
@@ -335,7 +341,7 @@ def test_middleware_handles_null_json():
     assert response.status_code == 422
 
 
-def test_middleware_handles_very_long_url():
+def test_middleware_handles_very_long_url(client):
     """Test handling of extremely long URLs."""
     # Create a very long query string
     long_param = "x" * 10000
@@ -345,7 +351,7 @@ def test_middleware_handles_very_long_url():
     assert response.status_code in [200, 414, 400]
 
 
-def test_middleware_handles_special_characters_in_url():
+def test_middleware_handles_special_characters_in_url(client):
     """Test handling of special characters in URL."""
     # Try various special characters
     special_chars = [
@@ -361,7 +367,7 @@ def test_middleware_handles_special_characters_in_url():
         assert response.status_code in [200, 400, 404]
 
 
-def test_middleware_handles_multiple_content_type_headers():
+def test_middleware_handles_multiple_content_type_headers(client):
     """Test handling of multiple Content-Type headers."""
     response = client.post(
         "/api/v1/simulate",
@@ -375,7 +381,7 @@ def test_middleware_handles_multiple_content_type_headers():
     assert response.status_code == 422  # Validation error for empty config
 
 
-def test_request_with_no_headers():
+def test_request_with_no_headers(client):
     """Test request with minimal headers."""
     # TestClient always adds some headers, but we can test with minimal set
     response = client.get("/api/v1/health")
@@ -387,7 +393,7 @@ def test_request_with_no_headers():
 # STARTUP AND SHUTDOWN
 # =============================================================================
 
-def test_app_startup_initializes_components():
+def test_app_startup_initializes_components(client):
     """Test that app startup initializes necessary components."""
     # Check that job queue is initialized
     response = client.get("/api/v2/abm/queue/stats")
@@ -401,7 +407,7 @@ def test_app_startup_initializes_components():
         assert "max_concurrent_jobs" in data
 
 
-def test_root_endpoint_returns_api_info():
+def test_root_endpoint_returns_api_info(client):
     """Test that root endpoint returns API information."""
     response = client.get("/")
 

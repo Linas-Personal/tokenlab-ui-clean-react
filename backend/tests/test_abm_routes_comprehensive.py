@@ -15,16 +15,19 @@ import pytest
 import asyncio
 import json
 from fastapi.testclient import TestClient
-from app.main import app
 
-client = TestClient(app)
+
+@pytest.fixture(scope="module")
+def client(test_client):
+    """Use test_client fixture from conftest.py."""
+    return test_client
 
 
 # =============================================================================
 # ABM SYNC ENDPOINT - BOUNDARY CONDITIONS
 # =============================================================================
 
-def test_abm_sync_minimal_config():
+def test_abm_sync_minimal_config(client):
     """Test ABM with absolute minimum valid configuration."""
     config = {
         "token": {
@@ -58,7 +61,7 @@ def test_abm_sync_minimal_config():
     assert data["num_agents"] == 50  # 1 cohort * 50 agents
 
 
-def test_abm_sync_zero_tge_zero_cliff():
+def test_abm_sync_zero_tge_zero_cliff(client):
     """Test ABM with zero TGE and zero cliff (immediate vesting)."""
     config = {
         "token": {
@@ -98,7 +101,7 @@ def test_abm_sync_zero_tge_zero_cliff():
     assert month_0["total_unlocked"] > 0  # Immediate vesting
 
 
-def test_abm_sync_100_percent_tge():
+def test_abm_sync_100_percent_tge(client):
     """Test ABM with 100% TGE (all unlocked immediately)."""
     config = {
         "token": {
@@ -137,7 +140,7 @@ def test_abm_sync_100_percent_tge():
     assert month_1["total_unlocked"] == 0
 
 
-def test_abm_sync_very_long_cliff():
+def test_abm_sync_very_long_cliff(client):
     """Test ABM with cliff longer than horizon."""
     config = {
         "token": {
@@ -172,7 +175,7 @@ def test_abm_sync_very_long_cliff():
         assert metric["total_unlocked"] == 0
 
 
-def test_abm_sync_single_agent_per_cohort():
+def test_abm_sync_single_agent_per_cohort(client):
     """Test ABM with minimum agents (1 per cohort)."""
     config = {
         "token": {
@@ -211,7 +214,7 @@ def test_abm_sync_single_agent_per_cohort():
     assert data["num_agents"] == 2  # 2 cohorts * 1 agent
 
 
-def test_abm_sync_max_agents():
+def test_abm_sync_max_agents(client):
     """Test ABM with maximum reasonable agents."""
     config = {
         "token": {
@@ -249,7 +252,7 @@ def test_abm_sync_max_agents():
 # ABM VALIDATION ENDPOINT
 # =============================================================================
 
-def test_abm_validate_too_many_agents():
+def test_abm_validate_too_many_agents(client):
     """Test validation warns about excessive agent count."""
     config = {
         "token": {
@@ -275,7 +278,7 @@ def test_abm_validate_too_many_agents():
     assert any("agent" in w.lower() or "slow" in w.lower() for w in data["warnings"])
 
 
-def test_abm_validate_allocation_over_100():
+def test_abm_validate_allocation_over_100(client):
     """Test validation catches allocation exceeding 100%."""
     config = {
         "token": {
@@ -298,7 +301,7 @@ def test_abm_validate_allocation_over_100():
     assert any("100" in e for e in data["errors"])
 
 
-def test_abm_validate_very_long_horizon():
+def test_abm_validate_very_long_horizon(client):
     """Test validation warns about very long simulations."""
     config = {
         "token": {
@@ -323,7 +326,7 @@ def test_abm_validate_very_long_horizon():
 # ERROR HANDLING
 # =============================================================================
 
-def test_abm_sync_missing_required_fields():
+def test_abm_sync_missing_required_fields(client):
     """Test ABM with missing required configuration."""
     config = {
         "token": {
@@ -338,7 +341,7 @@ def test_abm_sync_missing_required_fields():
     assert response.status_code == 422  # Validation error
 
 
-def test_abm_sync_invalid_pricing_model():
+def test_abm_sync_invalid_pricing_model(client):
     """Test ABM with invalid pricing model."""
     config = {
         "token": {
@@ -368,7 +371,7 @@ def test_abm_sync_invalid_pricing_model():
     assert response.status_code == 422  # Validation error
 
 
-def test_abm_sync_negative_values():
+def test_abm_sync_negative_values(client):
     """Test ABM handles negative values gracefully."""
     config = {
         "token": {
@@ -399,7 +402,7 @@ def test_abm_sync_negative_values():
     assert response.status_code in [422, 500]
 
 
-def test_abm_sync_empty_buckets():
+def test_abm_sync_empty_buckets(client):
     """Test ABM with no allocation buckets."""
     config = {
         "token": {
@@ -425,7 +428,7 @@ def test_abm_sync_empty_buckets():
 # ASYNC JOB QUEUE - INTEGRATION TESTS
 # =============================================================================
 
-def test_abm_async_job_submission():
+def test_abm_async_job_submission(client):
     """Test async job submission and status polling."""
     config = {
         "token": {
@@ -493,14 +496,14 @@ def test_abm_async_job_submission():
     assert len(results_data["global_metrics"]) == 6
 
 
-def test_abm_async_job_not_found():
+def test_abm_async_job_not_found(client):
     """Test getting status of non-existent job."""
     response = client.get("/api/v2/abm/jobs/nonexistent_job_id/status")
 
     assert response.status_code == 404
 
 
-def test_abm_async_results_before_completion():
+def test_abm_async_results_before_completion(client):
     """Test getting results before job completes."""
     config = {
         "token": {
@@ -548,7 +551,7 @@ def test_abm_async_results_before_completion():
         assert "not completed" in error_data["detail"].lower()
 
 
-def test_abm_async_cache_hit():
+def test_abm_async_cache_hit(client):
     """Test that identical configs use cached results."""
     config = {
         "token": {
@@ -598,7 +601,7 @@ def test_abm_async_cache_hit():
     assert status2["status"] == "completed"
 
 
-def test_abm_list_all_jobs():
+def test_abm_list_all_jobs(client):
     """Test listing all jobs endpoint."""
     response = client.get("/api/v2/abm/jobs")
 
@@ -608,7 +611,7 @@ def test_abm_list_all_jobs():
     assert isinstance(data["jobs"], list)
 
 
-def test_abm_queue_stats():
+def test_abm_queue_stats(client):
     """Test queue statistics endpoint."""
     response = client.get("/api/v2/abm/queue/stats")
 
@@ -623,7 +626,7 @@ def test_abm_queue_stats():
 # CONCURRENT REQUESTS & RACE CONDITIONS
 # =============================================================================
 
-def test_abm_concurrent_async_submissions():
+def test_abm_concurrent_async_submissions(client):
     """Test multiple concurrent job submissions."""
     import concurrent.futures
 
@@ -678,7 +681,7 @@ def test_abm_concurrent_async_submissions():
 # PRICING MODELS - EDGE CASES
 # =============================================================================
 
-def test_abm_bonding_curve_pricing():
+def test_abm_bonding_curve_pricing(client):
     """Test bonding curve pricing with extreme parameters."""
     config = {
         "token": {
@@ -717,7 +720,7 @@ def test_abm_bonding_curve_pricing():
     assert all(p > 0 for p in prices)
 
 
-def test_abm_eoe_pricing_with_zero_velocity():
+def test_abm_eoe_pricing_with_zero_velocity(client):
     """Test EOE pricing handles zero velocity edge case."""
     config = {
         "token": {
@@ -761,7 +764,7 @@ def test_abm_eoe_pricing_with_zero_velocity():
 # STAKING & TREASURY - EDGE CASES
 # =============================================================================
 
-def test_abm_staking_at_max_capacity():
+def test_abm_staking_at_max_capacity(client):
     """Test staking when pool reaches max capacity."""
     config = {
         "token": {
@@ -808,7 +811,7 @@ def test_abm_staking_at_max_capacity():
     assert month_12["total_staked"] <= max_capacity * 1.01  # Small buffer for float precision
 
 
-def test_abm_treasury_with_zero_fees():
+def test_abm_treasury_with_zero_fees(client):
     """Test treasury with zero transaction fees."""
     config = {
         "token": {

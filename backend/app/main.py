@@ -2,6 +2,7 @@
 import os
 import time
 from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -27,12 +28,42 @@ limiter = Limiter(
     enabled=rate_limit_enabled
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan - startup and shutdown."""
+    try:
+        from app.abm.async_engine.job_queue import AsyncJobQueue
+        from app.abm.async_engine.progress_streaming import ProgressStreamer
+
+        max_concurrent = int(os.getenv("ABM_MAX_CONCURRENT_JOBS", "5"))
+        job_ttl = int(os.getenv("ABM_JOB_TTL_HOURS", "24"))
+
+        app.state.abm_job_queue = AsyncJobQueue(max_concurrent, job_ttl)
+        app.state.abm_job_queue.start_cleanup_task()
+        app.state.abm_progress_streamer = ProgressStreamer(app.state.abm_job_queue)
+
+        logger.info(f"ABM job queue initialized: max_concurrent={max_concurrent}, ttl={job_ttl}h")
+    except Exception as e:
+        logger.error(f"Failed to initialize ABM components: {e}", exc_info=True)
+
+    yield
+
+    try:
+        if hasattr(app.state, "abm_job_queue"):
+            await app.state.abm_job_queue.shutdown()
+            logger.info("ABM job queue shutdown complete")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}", exc_info=True)
+
+
 app = FastAPI(
     title="Vesting Simulator API",
     description="REST API for TokenLab vesting simulation engine",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 app.state.limiter = limiter
@@ -91,34 +122,6 @@ app.include_router(health.router)
 app.include_router(abm_simulation.router)
 
 logger.info("Vesting Simulator API initialized")
-
-
-@app.on_event("startup")
-async def startup_event():
-    try:
-        from app.abm.async_engine.job_queue import AsyncJobQueue
-        from app.abm.async_engine.progress_streaming import ProgressStreamer
-
-        max_concurrent = int(os.getenv("ABM_MAX_CONCURRENT_JOBS", "5"))
-        job_ttl = int(os.getenv("ABM_JOB_TTL_HOURS", "24"))
-
-        app.state.abm_job_queue = AsyncJobQueue(max_concurrent, job_ttl)
-        app.state.abm_job_queue.start_cleanup_task()
-        app.state.abm_progress_streamer = ProgressStreamer(app.state.abm_job_queue)
-
-        logger.info(f"ABM job queue initialized: max_concurrent={max_concurrent}, ttl={job_ttl}h")
-    except Exception as e:
-        logger.error(f"Failed to initialize ABM components: {e}", exc_info=True)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    try:
-        if hasattr(app.state, "abm_job_queue"):
-            await app.state.abm_job_queue.shutdown()
-            logger.info("ABM job queue shutdown complete")
-    except Exception as e:
-        logger.error(f"Error during shutdown: {e}", exc_info=True)
 
 
 @app.get("/")
