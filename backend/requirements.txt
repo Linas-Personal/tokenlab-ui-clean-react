@@ -1,9 +1,8 @@
-fastapi==0.115.0
+fastapi==0.128.0  # Latest version includes starlette security fixes
 uvicorn[standard]==0.32.1
 pydantic==2.10.5
 pydantic-settings==2.7.1
 python-multipart==0.0.22  # CVE-2026-24486 fix
-starlette==0.47.2  # CVE-2024-47874, CVE-2025-54121 fixes
 numpy==2.2.6
 pandas==2.3.0
 matplotlib==3.10.3
@@ -14,3 +13,14 @@ seaborn==0.13.2
 tqdm==4.67.1
 psutil==7.1.3
 slowapi==0.1.9
+
+# Monitoring and observability
+sentry-sdk[fastapi]==2.20.0
+prometheus-fastapi-instrumentator==7.0.0
+
+# Security updates
+aiohttp==3.13.3  # CVE-2025-69223-69230 fixes
+protobuf==6.33.5  # CVE-2026-0994 fix
+nbconvert==7.17.0  # CVE-2025-53000 fix
+pip>=25.3  # CVE-2025-8869 fix
+wheel>=0.46.2  # CVE-2026-24049 fix

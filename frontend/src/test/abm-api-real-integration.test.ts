@@ -35,7 +35,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
   })
 
   describe('Async Job Submission - Real Backend', () => {
-    it.skipIf(!backendAvailable)('submits real ABM job and polls for completion', async () => {
+    it('submits real ABM job and polls for completion', { skip: !backendAvailable }, async () => {
       const config: ABMSimulationRequest = {
         token: {
           name: 'RealIntegrationTest',
@@ -130,7 +130,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
       expect(unlocks[0]).toBeGreaterThan(0)  // Should have unlocked something
     }, { timeout: 60000 })  // 60s timeout for real API calls
 
-    it.skipIf(!backendAvailable)('handles validation errors from real backend', async () => {
+    it('handles validation errors from real backend', { skip: !backendAvailable }, async () => {
       const invalidConfig: any = {
         token: {
           name: 'Invalid',
@@ -151,14 +151,14 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
         .rejects.toThrow()
     })
 
-    it.skipIf(!backendAvailable)('handles 404 for non-existent jobs', async () => {
+    it('handles 404 for non-existent jobs', { skip: !backendAvailable }, async () => {
       await expect(abmAPIClient.getJobStatus('nonexistent_job_12345'))
         .rejects.toThrow()
     })
   })
 
   describe('Monte Carlo - Real Backend', () => {
-    it.skipIf(!backendAvailable)('submits real Monte Carlo simulation', async () => {
+    it('submits real Monte Carlo simulation', { skip: !backendAvailable }, async () => {
       const config: ABMSimulationRequest = {
         token: {
           name: 'MCTest',
@@ -240,7 +240,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
   })
 
   describe('Error Handling - Real Backend Errors', () => {
-    it.skipIf(!backendAvailable)('receives real 422 validation error', async () => {
+    it('receives real 422 validation error', { skip: !backendAvailable }, async () => {
       const config: any = {
         token: {
           // Missing required fields
@@ -258,7 +258,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
       }
     })
 
-    it.skipIf(!backendAvailable)('handles real network timeout', async () => {
+    it('handles real network timeout', { skip: !backendAvailable }, async () => {
       // This tests real timeout behavior
       const config: ABMSimulationRequest = {
         token: {
@@ -296,7 +296,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
   })
 
   describe('Queue Statistics - Real Backend', () => {
-    it.skipIf(!backendAvailable)('fetches real queue stats', async () => {
+    it('fetches real queue stats', { skip: !backendAvailable }, async () => {
       const stats = await abmAPIClient.getQueueStats()
 
       expect(stats).toHaveProperty('total_jobs')
@@ -307,7 +307,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
       expect(typeof stats.max_concurrent_jobs).toBe('number')
     })
 
-    it.skipIf(!backendAvailable)('lists real jobs', async () => {
+    it('lists real jobs', { skip: !backendAvailable }, async () => {
       const response = await abmAPIClient.listJobs()
 
       expect(response).toHaveProperty('jobs')
@@ -316,7 +316,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
   })
 
   describe('Config Validation - Real Backend', () => {
-    it.skipIf(!backendAvailable)('validates config against real backend', async () => {
+    it('validates config against real backend', { skip: !backendAvailable }, async () => {
       const config: ABMSimulationRequest = {
         token: {
           name: 'ValidationTest',

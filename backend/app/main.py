@@ -12,6 +12,20 @@ from slowapi.errors import RateLimitExceeded
 from app.api.routes import simulation, health, abm_simulation
 from app.logging_config import setup_logging, get_logger
 
+# Sentry error tracking
+if os.getenv("SENTRY_DSN"):
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment=os.getenv("SENTRY_ENVIRONMENT", "development"),
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
+        integrations=[FastApiIntegration()],
+    )
+    print(f"[OK] Sentry initialized for {os.getenv('SENTRY_ENVIRONMENT', 'development')}")
+
 log_file = Path(__file__).parent.parent / "logs" / "app.log"
 setup_logging(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -65,6 +79,13 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan
 )
+
+# Prometheus metrics
+if os.getenv("PROMETHEUS_ENABLED", "true").lower() == "true":
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator().instrument(app).expose(app)
+    print("[OK] Prometheus metrics enabled at /metrics")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

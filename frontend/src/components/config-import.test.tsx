@@ -349,9 +349,7 @@ describe('Config Import/Upload Functionality', () => {
         expect(nameInput.value).toBe('Tier2Token')
       })
 
-      // Verify tier 2 mode is selected
-      const tierSelect = screen.getByLabelText(/Simulation Tier/i) as HTMLSelectElement
-      expect(tierSelect.value).toBe('tier2')
+      // Note: Tier selection UI was removed - we now have a single ABM simulation mode
     })
   })
 
