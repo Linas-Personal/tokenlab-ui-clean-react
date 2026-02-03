@@ -533,19 +533,7 @@ class TransactionManagement_TrendSimple(TransactionManagement):
 
 class TransactionManagement_Stochastic(TransactionManagement):
     """
-    Users a simple binomial distribution to model the number of active users.
-
-    Uses the normal distribution to simulate the transaction value.
-
-    So, at each iteration the execute() function does the following
-
-    1) Uses the binomial distribution to simulate the number of active users.
-    2) Uses the value_mean parameter and the value_std to calculate the average value of transactions.
-    3) Uses 1 and 2 to get an estimate of the total value.
-
-    Dependent class: The execute() argument is reading from a UserGrowth class that provides
-    the current number of users
-
+    Binomial user activity with a configurable transaction value distribution.
     """
 
     def __init__(
@@ -567,54 +555,7 @@ class TransactionManagement_Stochastic(TransactionManagement):
         activity_probs: Union[float, List[float]] = 1,
         type_transaction: str = "positive",
     ) -> None:
-        """
-
-        value_per_transaction: If this is set, then the value per transaction is fixed, and overrides the distribution. Otherwise,
-        leave to None.
-
-        value_dist_parameters: Parameters for the value distribution. This can also be a list of dictionaries, where each dictionary
-        within the list is a set of parameters. The values inside the dictionary must use the keys 'loc' and 'scale'.
-
-        value_distribution: by default this is the normal distribution, but any scipy distribution
-         is supported.
-
-
-        value_drift_parameters: If this is set, then the value dist parameters change at every iteration by adding those values to the value parameters.
-
-        transactions_distribution: uses a distribution to model the number of transactions per user. By default
-        this is a Poisson distribution
-
-        transactions_dist_parameters: Parameters for the transaction distribution. This can also be a list of dictionaries, where each dictionary
-        within the list is a set of parameters.
-
-        transactions_drift_parameters: If this is set, then the parameters of the distribution for transactions change at every iteration, by adding those values to the parameters.
-
-        transactions_per_user: If this is not None, then the expected number of transactions is equal to this constant.
-        In the back-scenes, this creates a uniform distribution with bounds [transactions_constant,transactions_constant]
-
-        type_transaction: positive (positive transactions only), negative or mixed. It is positive by default
-
-
-        The value at each iteration of execution is sampled from the value distribution (if the distribution is set)
-
-        The final equation is using the following formulas when value distribution is active:
-
-        total value = distribution(loc,scale)
-        a) loc = num_active_users*num_transactions*value_per_transaction(or loc parameter)
-        b) scale = scale
-
-        If the value distribution is absent, and a value_per_transaction is defined instead, then
-        the formula becomes:
-
-        total value = val_mean*self.active_users*trans
-
-        activity_probs: This is either a float or a list of floats, and determines the parameter p of the binomial
-        distribution. Note: This is there for legacy reasons. You are recommended to use
-
-        NOTE: Average transactions per user can never be below 0. If 0 (due to random sampling) then it's set to 1
-
-
-        """
+        """Configure stochastic transaction generation."""
         super(TransactionManagement_Stochastic, self).__init__()
         self.name = name
 
@@ -671,7 +612,6 @@ class TransactionManagement_Stochastic(TransactionManagement):
                 "You need to define at least one of: transactions_per_user or transaction_dist_parameters or transactions_constant"
             )
 
-        # sanity test, all lists should be the same length
         lengths = []
         if isinstance(self.value_dist_parameters, (list, np.ndarray)):
             self.max_iterations = len(self.value_dist_parameters)
@@ -703,8 +643,6 @@ class TransactionManagement_Stochastic(TransactionManagement):
         num_users = self.dependencies[dependency]["num_users"]
         self.total_users = int(num_users)
 
-        # Start by estimating how many users are actually active
-        # because activitiy_probabilities can be either an int or a list, we have to take into account both scenarios
         if isinstance(self.activity_probabilities, (list, np.ndarray)):
             act = self.activity_probabilities[self.iteration]
         else:
@@ -718,7 +656,6 @@ class TransactionManagement_Stochastic(TransactionManagement):
         else:
             trans_param = self.transaction_dist_parameters
 
-        # Get the transactions.
         if self.transactions_per_user is None:
             seed = int(int(time.time()) * np.random.rand())
             trans = np.mean(
@@ -729,7 +666,6 @@ class TransactionManagement_Stochastic(TransactionManagement):
         else:
             trans = int(self.transactions_per_user)
 
-        # multiply average transactions per user times the number of users
         self.num_transactions = trans
 
         if isinstance(self.value_dist_parameters, (list, np.ndarray)):
@@ -743,23 +679,16 @@ class TransactionManagement_Stochastic(TransactionManagement):
                 self.value_distribution.rvs(size=1000, **val_param, random_state=seed)
             )
 
-            # try:
-            #     value_mean=np.mean(self.value_distribution.rvs(size=1000,loc=val_param['loc'],scale=val_param['scale'],random_state=seed))
-            # except:
-            #     value_mean=np.mean(self.value_distribution.rvs(size=1000,**val_param,random_state=seed))
-
         else:
             value_mean = self.value_per_transaction
 
         value_total = trans * value_mean * self.active_users
 
-        # transaction value can never be negative
         if value_total < 0 and self.type_transaction == "positive":
             value_total = 0
         elif value_total > 0 and self.type_transaction == "negative":
             value_total = 0
 
-        # total value is average expected value times the number of transactions
         self.transactions_value = value_total
 
         self._transactions_value_store.append(value_total)
