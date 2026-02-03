@@ -170,21 +170,18 @@ export interface JobSubmissionResponse {
   job_id: string;
   status: JobStatus;
   status_url: string;
-  stream_url: string;
-  results_url: string;
+  stream_url?: string;
+  results_url?: string;
   cached: boolean;
 }
 
 export interface JobStatusResponse {
   job_id: string;
   status: JobStatus;
-  progress_pct: number;
+  progress_pct?: number;
   current_month?: number;
   total_months?: number;
-  error_message?: string;
-  created_at: string;
-  started_at?: string;
-  completed_at?: string;
+  error?: string;
 }
 
 export interface JobListResponse {
@@ -205,6 +202,12 @@ export interface QueueStatsResponse {
   cache_size: number;
   cache_hits: number;
   cache_misses: number;
+}
+
+export interface ABMValidationResponse {
+  valid: boolean;
+  warnings: string[];
+  errors: string[];
 }
 
 // ===========================

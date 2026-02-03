@@ -1210,6 +1210,7 @@ class DynamicPricingController:
         Models:
         - constant: Fixed price (Tier 1 behavior)
         - linear: P = P0 * (1 - elasticity * (S/S_max))
+        - bonding_curve: P = P0 * (1 - S/S_max) ^ elasticity
         - bonding_curve: P = P0 * (1 - (S / S_max)) ^ elasticity
         """
         if not self.pricing_config.get("enabled", False):
@@ -1234,6 +1235,7 @@ class DynamicPricingController:
                 elasticity = self.pricing_config.get("elasticity", 0.5)
             supply_ratio = circulating_supply / self.max_supply if self.max_supply > 0 else 0
             supply_ratio = min(max(supply_ratio, 0.0), 1.0)
+            price = self.initial_price * ((1 - supply_ratio) ** elasticity)
             price = self.initial_price * (1 - supply_ratio) ** elasticity
             price = max(0.01, price)
 
@@ -1482,7 +1484,10 @@ class MonteCarloRunner:
         optional_fields = ["current_price", "staked_amount", "liquidity_deployed", "treasury_balance", "sell_volume_ratio"]
         for field in optional_fields:
             if field in df_combined.columns:
-                agg_dict[field] = ["mean"]  # Use mean for these fields (not distributions)
+                if field == "current_price":
+                    agg_dict[field] = [quantile_10, "median", quantile_90, "mean", "std"]
+                else:
+                    agg_dict[field] = ["mean"]  # Use mean for these fields (not distributions)
 
         df_stats = df_combined.groupby("month_index").agg(agg_dict)
 

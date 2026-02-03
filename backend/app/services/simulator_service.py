@@ -128,7 +128,12 @@ class SimulatorService:
                     expected_circulating_total_p10=float(row["expected_circulating_total_p10"]) if row.get("expected_circulating_total_p10") is not None else None,
                     expected_circulating_total_p90=float(row["expected_circulating_total_p90"]) if row.get("expected_circulating_total_p90") is not None else None,
                     expected_circulating_total_median=float(row["expected_circulating_total_median"]) if row.get("expected_circulating_total_median") is not None else None,
-                    expected_circulating_total_std=float(row["expected_circulating_total_std"]) if row.get("expected_circulating_total_std") is not None else None
+                    expected_circulating_total_std=float(row["expected_circulating_total_std"]) if row.get("expected_circulating_total_std") is not None else None,
+
+                    current_price_p10=float(row["current_price_p10"]) if row.get("current_price_p10") is not None else None,
+                    current_price_p90=float(row["current_price_p90"]) if row.get("current_price_p90") is not None else None,
+                    current_price_median=float(row["current_price_median"]) if row.get("current_price_median") is not None else None,
+                    current_price_std=float(row["current_price_std"]) if row.get("current_price_std") is not None else None
                 )
             )
 

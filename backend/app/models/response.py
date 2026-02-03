@@ -49,6 +49,11 @@ class GlobalMetric(BaseModel):
     expected_circulating_total_median: Optional[float] = None
     expected_circulating_total_std: Optional[float] = None
 
+    current_price_p10: Optional[float] = None
+    current_price_p90: Optional[float] = None
+    current_price_median: Optional[float] = None
+    current_price_std: Optional[float] = None
+
 
 class SummaryCards(BaseModel):
     """Summary statistics for dashboard cards."""

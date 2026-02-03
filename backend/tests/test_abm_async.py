@@ -177,20 +177,19 @@ async def test_concurrent_jobs():
 
 
 @pytest.mark.anyio
-@pytest.mark.skip(reason="Jobs complete too quickly to reliably test cancellation")
 async def test_job_cancellation():
     """Test job cancellation."""
     from app.abm.async_engine.job_queue import AsyncJobQueue
 
     job_queue = AsyncJobQueue(max_concurrent_jobs=1, job_ttl_hours=1)
 
-    # Create config with long horizon
+    # Create config with long horizon and enough agents to allow cancellation
     config = {
         "token": {
             "name": "TestToken",
-            "total_supply": 1_000_000_000,
+            "total_supply": 100_000_000,
             "start_date": "2025-01-01",
-            "horizon_months": 36  # Long simulation
+            "horizon_months": 120
         },
         "buckets": [
             {
@@ -198,12 +197,13 @@ async def test_job_cancellation():
                 "allocation": 100,
                 "tge_unlock_pct": 0,
                 "cliff_months": 0,
-                "vesting_months": 36
+                "vesting_months": 120
             }
         ],
         "abm": {
             "pricing_model": "eoe",
-            "agents_per_cohort": 50
+            "agents_per_cohort": 1000,
+            "agent_granularity": "full_individual"
         }
     }
 
@@ -213,7 +213,14 @@ async def test_job_cancellation():
     print(f"Job submitted: {job_id}")
 
     # Wait for it to start
-    await asyncio.sleep(0.1)
+    status = None
+    for _ in range(100):
+        status = job_queue.get_job_status(job_id)
+        if status and status["status"] == "running":
+            break
+        await asyncio.sleep(0.05)
+
+    assert status and status["status"] == "running", "Job did not enter running state in time"
 
     # Cancel it
     print("Cancelling job...")
@@ -221,7 +228,11 @@ async def test_job_cancellation():
     assert success, "Cancellation should succeed"
 
     # Wait a bit
-    await asyncio.sleep(0.2)
+    for _ in range(100):
+        status = job_queue.get_job_status(job_id)
+        if status and status["status"] == "cancelled":
+            break
+        await asyncio.sleep(0.05)
 
     # Check status
     status = job_queue.get_job_status(job_id)

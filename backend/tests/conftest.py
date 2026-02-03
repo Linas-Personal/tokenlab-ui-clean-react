@@ -1,5 +1,8 @@
 """Pytest configuration and fixtures for test suite."""
 
+import os
+os.environ["RATE_LIMIT_ENABLED"] = "true"
+
 import pytest
 from contextlib import asynccontextmanager
 from fastapi.testclient import TestClient
@@ -39,8 +42,12 @@ def test_client():
     """
     # Reset rate limiter state before each test
     from app.main import limiter
+    from app.api.routes.health import limiter as health_limiter
+    from app.api.routes.simulation import limiter as simulation_limiter
     import random
     limiter.reset()
+    health_limiter.reset()
+    simulation_limiter.reset()
 
     # Create client with unique remote address to isolate rate limiting per test
     with TestClient(app, base_url=f"http://test-{random.randint(1000000, 9999999)}.example.com") as client:
@@ -48,3 +55,5 @@ def test_client():
 
     # Clean up rate limiter state after test
     limiter.reset()
+    health_limiter.reset()
+    simulation_limiter.reset()

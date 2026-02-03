@@ -263,7 +263,6 @@ def test_edge_cases():
         print("   - Assumptions about valid inputs")
         print("\n   Consider adding validation or better error messages.")
 
-    return results
 
 
 def main():

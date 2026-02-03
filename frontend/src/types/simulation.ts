@@ -39,6 +39,11 @@ export interface GlobalMetric {
   expected_circulating_total_p90?: number
   expected_circulating_total_median?: number
   expected_circulating_total_std?: number
+
+  current_price_p10?: number
+  current_price_p90?: number
+  current_price_median?: number
+  current_price_std?: number
 }
 
 export interface SummaryCards {

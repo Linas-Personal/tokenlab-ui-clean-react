@@ -139,8 +139,8 @@ describe('ABM Configuration Form - User Interactions', () => {
 
       // Agent Population accordion is open by default, slider should be visible
       // The slider is rendered by shadcn/ui Slider component - check for the actual displayed value
-      const displayedValue = screen.getByText(/^50$/) // Default value from DEFAULT_CONFIG
-      expect(displayedValue).toBeInTheDocument()
+      const displayedValue = screen.getByTestId('agents-per-cohort-value')
+      expect(displayedValue).toHaveTextContent('50')
     })
 
     it('enforces min and max bounds for agents per cohort', async () => {
@@ -432,7 +432,7 @@ describe('ABM Configuration Form - User Interactions', () => {
       await user.click(mcAccordion)
 
       // Check that default value is displayed (100 from DEFAULT_CONFIG)
-      expect(screen.getByText('100')).toBeInTheDocument()
+      expect(screen.getByTestId('monte-carlo-trials-value')).toHaveTextContent('100')
     })
 
     it('selects variance level', async () => {
@@ -560,9 +560,9 @@ describe('ABM Configuration Form - User Interactions', () => {
       const cohortAccordion = screen.getByText('Cohort Behavior Presets (Optional)')
       await user.click(cohortAccordion)
 
-      expect(screen.getByText('Conservative')).toBeInTheDocument()
-      expect(screen.getByText('Moderate')).toBeInTheDocument()
-      expect(screen.getByText('Aggressive')).toBeInTheDocument()
+      expect(screen.getAllByText('Conservative').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Moderate').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Aggressive').length).toBeGreaterThan(0)
     })
 
     it('assigns behavioral preset to bucket', async () => {
@@ -649,12 +649,12 @@ describe('ABM Configuration Form - User Interactions', () => {
       )
 
       // Check summary values
-      expect(screen.getByText('meta_agents')).toBeInTheDocument()
-      expect(screen.getByText('100')).toBeInTheDocument()
-      expect(screen.getByText('BONDING_CURVE')).toBeInTheDocument()
-      expect(screen.getByText('$2.5')).toBeInTheDocument()
-      expect(screen.getByText('Yes', { selector: 'span' })).toBeInTheDocument()  // Staking
-      expect(screen.getByText('50 trials')).toBeInTheDocument()
+      expect(screen.getByTestId('summary-agent-granularity')).toHaveTextContent('meta_agents')
+      expect(screen.getByTestId('summary-agents-per-cohort')).toHaveTextContent('100')
+      expect(screen.getByTestId('summary-pricing-model')).toHaveTextContent('BONDING_CURVE')
+      expect(screen.getByTestId('summary-initial-price')).toHaveTextContent('$2.5')
+      expect(screen.getByTestId('summary-staking-enabled')).toHaveTextContent('Yes')
+      expect(screen.getByTestId('summary-monte-carlo')).toHaveTextContent('50 trials')
     })
   })
 
