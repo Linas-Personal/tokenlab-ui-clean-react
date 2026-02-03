@@ -13,7 +13,7 @@ import { PriceEvolutionChart } from '@/components/charts/PriceEvolutionChart'
 import { CirculatingSupplyChart } from '@/components/charts/CirculatingSupplyChart'
 import { SellPressureChart } from '@/components/charts/SellPressureChart'
 import { useJobPolling } from '@/hooks/useJobPolling'
-import type { JobStatusResponse } from '@/types/abm'
+import type { ABMCohortMetric, JobStatusResponse } from '@/types/abm'
 import { hasStakingMetrics, hasTreasuryMetrics } from '@/types/abm'
 import type { UseABMSimulationReturn } from '@/hooks/useABMSimulation'
 
@@ -86,9 +86,27 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
     if (!results?.global_metrics?.length) {
       return '—'
     }
-    const total = results.global_metrics.reduce((sum, m) => sum + m.price, 0)
-    return formatPrice(total / results.global_metrics.length, 4)
+    const { total, count } = results.global_metrics.reduce(
+      (acc, metric) => {
+        if (Number.isFinite(metric.price)) {
+          return { total: acc.total + metric.price, count: acc.count + 1 }
+        }
+        return acc
+      },
+      { total: 0, count: 0 }
+    )
+    if (!count) return '—'
+    return formatPrice(total / count, 4)
   }
+
+  const resolveCohortName = (metric: ABMCohortMetric): string =>
+    metric.cohort ?? metric.cohort_name ?? 'Unknown'
+
+  const normalizeCohortMetrics = (metrics?: ABMCohortMetric[]): ABMCohortMetric[] =>
+    metrics?.map(metric => ({
+      ...metric,
+      cohort: resolveCohortName(metric)
+    })) ?? []
 
   const renderEmptyState = () => (
     <Card>
@@ -187,6 +205,10 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
   const renderResults = () => {
     if (!results) return null
 
+    const lastMetric = results.global_metrics?.[results.global_metrics.length - 1]
+    const finalCirculatingSupply = results.summary.final_circulating_supply ?? lastMetric?.circulating_supply
+    const totalSold = results.summary.total_sold_cumulative ?? results.summary.total_tokens_sold
+
     const globalMetricsFormatted = results.global_metrics.map(m => ({
       month_index: m.month_index,
       date: m.date,
@@ -194,9 +216,13 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
       total_unlocked: m.total_unlocked,
       total_expected_sell: m.total_sold,
       expected_circulating_total: m.circulating_supply,
-      expected_circulating_pct: (m.circulating_supply / results.summary.final_circulating_supply) * 100,
+      expected_circulating_pct: finalCirculatingSupply
+        ? (m.circulating_supply / finalCirculatingSupply) * 100
+        : 0,
       total_staked: m.total_staked
     }))
+
+    const cohortMetrics = normalizeCohortMetrics(results.cohort_metrics)
 
     return (
       <div className="space-y-6">
@@ -221,11 +247,11 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Final Supply</p>
-                <p className="text-2xl font-bold">{formatNumber(results.summary.final_circulating_supply)}</p>
+                <p className="text-2xl font-bold">{formatNumber(finalCirculatingSupply)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Total Sold</p>
-                <p className="text-2xl font-bold">{formatNumber(results.summary.total_sold_cumulative)}</p>
+                <p className="text-2xl font-bold">{formatNumber(totalSold)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Avg Price</p>
@@ -274,8 +300,8 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
           </TabsContent>
 
           <TabsContent value="cohorts" className="space-y-6 mt-6">
-            {results.cohort_metrics && results.cohort_metrics.length > 0 ? (
-              <CohortBehaviorChart cohortMetrics={results.cohort_metrics} />
+            {cohortMetrics.length > 0 ? (
+              <CohortBehaviorChart cohortMetrics={cohortMetrics} />
             ) : (
               <Card>
                 <CardHeader>
