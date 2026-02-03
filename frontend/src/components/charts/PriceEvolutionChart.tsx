@@ -32,8 +32,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length) return null
 
   const dataPoint = payload[0]?.payload
-  // Note: Price confidence bands (current_price_p10/p90) are not currently implemented in backend
-  // but this code is future-proof if they are added
+  // Price confidence bands (current_price_p10/p90) are shown when Monte Carlo statistics are available
   const hasMC = dataPoint?.current_price_p10 !== undefined || dataPoint?.current_price_p90 !== undefined
 
   if (hasMC) {
@@ -113,8 +112,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 export function PriceEvolutionChart({ data }: PriceEvolutionChartProps) {
   const priceData = data.filter(d => d.current_price !== null && d.current_price !== undefined)
 
-  // Note: Price confidence bands are not currently implemented in backend
-  // This code is future-proof if current_price_p10/p90 are added later
+  // Price confidence bands are shown when current_price_p10/p90 are available
   const hasConfidenceBands = priceData.length > 0 &&
     (priceData[0] as any).current_price_p10 !== undefined &&
     (priceData[0] as any).current_price_p90 !== undefined

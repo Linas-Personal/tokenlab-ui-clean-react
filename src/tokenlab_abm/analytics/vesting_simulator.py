@@ -1210,30 +1210,28 @@ class DynamicPricingController:
         Models:
         - constant: Fixed price (Tier 1 behavior)
         - linear: P = P0 * (1 - elasticity * (S/S_max))
-        - bonding_curve: P = P0 * (S_max / S) ^ elasticity
+        - bonding_curve: P = P0 * (1 - S/S_max) ^ elasticity
         """
         if not self.pricing_config.get("enabled", False):
             return self.initial_price
 
-        model = self.pricing_config.get("pricing_model", "constant")
+        model = self.pricing_config.get("pricing_model") or self.pricing_config.get("model", "constant")
 
         if model == "constant":
             price = self.initial_price
 
         elif model == "linear":
-            elasticity = self.pricing_config.get("bonding_curve_param", 0.5)
+            elasticity = self.pricing_config.get("bonding_curve_param", self.pricing_config.get("elasticity", 0.5))
             supply_ratio = circulating_supply / self.max_supply if self.max_supply > 0 else 0
             price = self.initial_price * (1 - elasticity * supply_ratio)
             price = max(0.01, price)
 
         elif model == "bonding_curve":
-            elasticity = self.pricing_config.get("bonding_curve_param", 0.5)
-            if circulating_supply == 0:
-                # At TGE (circulating = 0), just use initial price
-                price = self.initial_price
-            else:
-                price = self.initial_price * (self.max_supply / circulating_supply) ** elasticity
-                price = max(0.01, min(price, self.initial_price * 100))
+            elasticity = self.pricing_config.get("bonding_curve_param", self.pricing_config.get("elasticity", 0.5))
+            supply_ratio = circulating_supply / self.max_supply if self.max_supply > 0 else 0
+            remaining_ratio = max(0.0, 1 - supply_ratio)
+            price = self.initial_price * (remaining_ratio ** elasticity)
+            price = max(0.01, price)
 
         else:
             price = self.initial_price
@@ -1480,7 +1478,10 @@ class MonteCarloRunner:
         optional_fields = ["current_price", "staked_amount", "liquidity_deployed", "treasury_balance", "sell_volume_ratio"]
         for field in optional_fields:
             if field in df_combined.columns:
-                agg_dict[field] = ["mean"]  # Use mean for these fields (not distributions)
+                if field == "current_price":
+                    agg_dict[field] = [quantile_10, "median", quantile_90, "mean", "std"]
+                else:
+                    agg_dict[field] = ["mean"]  # Use mean for these fields (not distributions)
 
         df_stats = df_combined.groupby("month_index").agg(agg_dict)
 

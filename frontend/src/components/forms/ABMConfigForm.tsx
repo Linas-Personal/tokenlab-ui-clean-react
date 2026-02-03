@@ -71,60 +71,49 @@ export function ABMConfigForm() {
   const { register, setValue, watch, getValues } = useFormContext<ABMConfigFormData>()
 
   const agentGranularity = useWatch({
-    name: 'abm.agent_granularity',
-    defaultValue: 'adaptive'
-  })
+    name: 'abm.agent_granularity'
+  }) ?? 'adaptive'
 
   const pricingModel = useWatch({
-    name: 'abm.pricing_model',
-    defaultValue: 'eoe'
-  })
+    name: 'abm.pricing_model'
+  }) ?? 'eoe'
 
   const enableStaking = useWatch({
-    name: 'abm.enable_staking',
-    defaultValue: false
-  })
+    name: 'abm.enable_staking'
+  }) ?? false
 
   const enableVolume = useWatch({
-    name: 'abm.enable_volume',
-    defaultValue: false
-  })
+    name: 'abm.enable_volume'
+  }) ?? false
 
   const volumeModel = useWatch({
-    name: 'abm.volume_config.volume_model',
-    defaultValue: 'proportional'
-  })
+    name: 'abm.volume_config.volume_model'
+  }) ?? 'proportional'
 
   const enableTreasury = useWatch({
-    name: 'abm.enable_treasury',
-    defaultValue: false
-  })
+    name: 'abm.enable_treasury'
+  }) ?? false
 
   const monteCarloEnabled = useWatch({
-    name: 'monte_carlo.enabled',
-    defaultValue: false
-  })
+    name: 'monte_carlo.enabled'
+  }) ?? false
 
   const agentsPerCohort = useWatch({
-    name: 'abm.agents_per_cohort',
-    defaultValue: 50
-  })
+    name: 'abm.agents_per_cohort'
+  }) ?? 50
 
   const numTrials = useWatch({
-    name: 'monte_carlo.num_trials',
-    defaultValue: 100
-  })
+    name: 'monte_carlo.num_trials'
+  }) ?? 100
 
   // Watch buckets for cohort mapping
   const buckets = useWatch({
-    name: 'buckets' as any,
-    defaultValue: []
-  })
+    name: 'buckets' as any
+  }) ?? []
 
   const bucketCohortMapping = useWatch({
-    name: 'abm.bucket_cohort_mapping',
-    defaultValue: {}
-  })
+    name: 'abm.bucket_cohort_mapping'
+  }) ?? {}
 
   return (
     <div className="space-y-6">
@@ -161,8 +150,13 @@ export function ABMConfigForm() {
 
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="agents-per-cohort">Agents Per Cohort</Label>
-                      <span className="text-sm font-semibold text-primary px-2 py-1 bg-primary/10 rounded">
+                      <span id="agents-per-cohort-label" className="text-sm font-medium leading-none">
+                        Agents Per Cohort
+                      </span>
+                      <span
+                        className="text-sm font-semibold text-primary px-2 py-1 bg-primary/10 rounded"
+                        data-testid="agents-per-cohort-value"
+                      >
                         {agentsPerCohort}
                       </span>
                     </div>
@@ -174,6 +168,7 @@ export function ABMConfigForm() {
                         step={10}
                         value={[agentsPerCohort]}
                         onValueChange={(value) => setValue('abm.agents_per_cohort', value[0])}
+                        aria-labelledby="agents-per-cohort-label"
                         className="w-full"
                       />
                       <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -629,8 +624,13 @@ export function ABMConfigForm() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <Label htmlFor="num-trials">Number of Trials</Label>
-                            <span className="text-sm font-semibold text-primary px-2 py-1 bg-primary/10 rounded">
+                            <span id="num-trials-label" className="text-sm font-medium leading-none">
+                              Number of Trials
+                            </span>
+                            <span
+                              className="text-sm font-semibold text-primary px-2 py-1 bg-primary/10 rounded"
+                              data-testid="monte-carlo-trials-value"
+                            >
                               {numTrials}
                             </span>
                           </div>
@@ -642,6 +642,7 @@ export function ABMConfigForm() {
                               step={10}
                               value={[numTrials]}
                               onValueChange={(value) => setValue('monte_carlo.num_trials', value[0])}
+                              aria-labelledby="num-trials-label"
                               className="w-full"
                             />
                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -830,39 +831,39 @@ export function ABMConfigForm() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Agent Granularity:</span>
-              <span className="font-semibold">{agentGranularity}</span>
+              <span className="font-semibold" data-testid="summary-agent-granularity">{agentGranularity}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Agents per Cohort:</span>
-              <span className="font-semibold">{agentsPerCohort}</span>
+              <span className="font-semibold" data-testid="summary-agents-per-cohort">{agentsPerCohort}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Pricing Model:</span>
-              <span className="font-semibold">{pricingModel.toUpperCase()}</span>
+              <span className="font-semibold" data-testid="summary-pricing-model">{pricingModel.toUpperCase()}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Initial Price:</span>
-              <span className="font-semibold">${watch('abm.initial_price', 1.0)}</span>
+              <span className="font-semibold" data-testid="summary-initial-price">${watch('abm.initial_price', 1.0)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Dynamic Volume:</span>
-              <span className="font-semibold">{enableVolume ? `${volumeModel}` : 'Disabled'}</span>
+              <span className="font-semibold" data-testid="summary-dynamic-volume">{enableVolume ? `${volumeModel}` : 'Disabled'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Staking Enabled:</span>
-              <span className="font-semibold">{enableStaking ? 'Yes' : 'No'}</span>
+              <span className="font-semibold" data-testid="summary-staking-enabled">{enableStaking ? 'Yes' : 'No'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Treasury Enabled:</span>
-              <span className="font-semibold">{enableTreasury ? 'Yes' : 'No'}</span>
+              <span className="font-semibold" data-testid="summary-treasury-enabled">{enableTreasury ? 'Yes' : 'No'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Monte Carlo:</span>
-              <span className="font-semibold">{monteCarloEnabled ? `${numTrials} trials` : 'Disabled'}</span>
+              <span className="font-semibold" data-testid="summary-monte-carlo">{monteCarloEnabled ? `${numTrials} trials` : 'Disabled'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Store Cohort Details:</span>
-              <span className="font-semibold">{watch('abm.store_cohort_details', true) ? 'Yes' : 'No'}</span>
+              <span className="font-semibold" data-testid="summary-store-cohort-details">{watch('abm.store_cohort_details', true) ? 'Yes' : 'No'}</span>
             </div>
           </div>
         </CardContent>

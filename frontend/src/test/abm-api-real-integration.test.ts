@@ -11,31 +11,22 @@
  * 2. Run tests: npm test src/test/abm-api-real-integration.test.ts
  */
 
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import abmAPIClient from '@/lib/abm-api'
 import type { ABMSimulationRequest } from '@/types/abm'
-
-const BACKEND_URL = 'http://localhost:8000'
-let backendAvailable = false
+import { ensureBackend, stopBackend } from '@/test/utils/backend-server'
 
 describe('ABM API Client - REAL Integration (No Mocks)', () => {
   beforeAll(async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/health`)
-      backendAvailable = response.ok
-      if (!backendAvailable) {
-        console.warn('⚠️  Backend not responding - integration tests will be skipped')
-        console.warn('   Start backend: cd backend && python -m app.main')
-      }
-    } catch (error) {
-      backendAvailable = false
-      console.warn('⚠️  Backend not available at localhost:8000')
-      console.warn('   Start backend: cd backend && python -m app.main')
-    }
+    await ensureBackend()
+  })
+
+  afterAll(async () => {
+    await stopBackend()
   })
 
   describe('Async Job Submission - Real Backend', () => {
-    it('submits real ABM job and polls for completion', { skip: !backendAvailable }, async () => {
+    it('submits real ABM job and polls for completion', { timeout: 60000 }, async () => {
       const config: ABMSimulationRequest = {
         token: {
           name: 'RealIntegrationTest',
@@ -128,9 +119,9 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
       // Verify REAL unlock data
       const unlocks = results.global_metrics.map(m => m.total_unlocked)
       expect(unlocks[0]).toBeGreaterThan(0)  // Should have unlocked something
-    }, { timeout: 60000 })  // 60s timeout for real API calls
+    })  // 60s timeout for real API calls
 
-    it('handles validation errors from real backend', { skip: !backendAvailable }, async () => {
+    it('handles validation errors from real backend', async () => {
       const invalidConfig: any = {
         token: {
           name: 'Invalid',
@@ -151,14 +142,14 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
         .rejects.toThrow()
     })
 
-    it('handles 404 for non-existent jobs', { skip: !backendAvailable }, async () => {
+    it('handles 404 for non-existent jobs', async () => {
       await expect(abmAPIClient.getJobStatus('nonexistent_job_12345'))
         .rejects.toThrow()
     })
   })
 
   describe('Monte Carlo - Real Backend', () => {
-    it('submits real Monte Carlo simulation', { skip: !backendAvailable }, async () => {
+    it('submits real Monte Carlo simulation', { timeout: 120000 }, async () => {
       const config: ABMSimulationRequest = {
         token: {
           name: 'MCTest',
@@ -236,11 +227,11 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
         expect(trial).toHaveProperty('final_price')
         expect(trial.final_price).toBeGreaterThan(0)
       })
-    }, { timeout: 120000 })  // 2min timeout for MC
+    })  // 2min timeout for MC
   })
 
   describe('Error Handling - Real Backend Errors', () => {
-    it('receives real 422 validation error', { skip: !backendAvailable }, async () => {
+    it('receives real 422 validation error', async () => {
       const config: any = {
         token: {
           // Missing required fields
@@ -258,7 +249,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
       }
     })
 
-    it('handles real network timeout', { skip: !backendAvailable }, async () => {
+    it('handles real network timeout', { timeout: 10000 }, async () => {
       // This tests real timeout behavior
       const config: ABMSimulationRequest = {
         token: {
@@ -292,11 +283,11 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
       // Submit and don't wait - tests async behavior
       const response = await abmAPIClient.submitABMSimulation(config)
       expect(response.job_id).toBeTruthy()
-    }, { timeout: 10000 })
+    })
   })
 
   describe('Queue Statistics - Real Backend', () => {
-    it('fetches real queue stats', { skip: !backendAvailable }, async () => {
+    it('fetches real queue stats', async () => {
       const stats = await abmAPIClient.getQueueStats()
 
       expect(stats).toHaveProperty('total_jobs')
@@ -307,7 +298,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
       expect(typeof stats.max_concurrent_jobs).toBe('number')
     })
 
-    it('lists real jobs', { skip: !backendAvailable }, async () => {
+    it('lists real jobs', async () => {
       const response = await abmAPIClient.listJobs()
 
       expect(response).toHaveProperty('jobs')
@@ -316,7 +307,7 @@ describe('ABM API Client - REAL Integration (No Mocks)', () => {
   })
 
   describe('Config Validation - Real Backend', () => {
-    it('validates config against real backend', { skip: !backendAvailable }, async () => {
+    it('validates config against real backend', async () => {
       const config: ABMSimulationRequest = {
         token: {
           name: 'ValidationTest',
