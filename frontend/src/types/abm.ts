@@ -238,10 +238,11 @@ export interface ABMGlobalMetric {
 
 export interface ABMCohortMetric {
   month_index: number;
-  cohort: string;
+  cohort?: string;
+  cohort_name?: string;
   num_agents: number;
-  total_locked: number;
-  total_unlocked: number;
+  total_locked?: number;
+  total_unlocked?: number;
   total_staked: number;
   total_sold: number;
   total_held: number;
@@ -267,16 +268,20 @@ export interface TreasuryMetrics {
 }
 
 export interface ABMSummaryCards {
-  final_price: number;
-  final_circulating_supply: number;
-  total_sold_cumulative: number;
-  total_staked_cumulative: number;
-  avg_monthly_sell_pressure: number;
-  max_monthly_sell_pressure: number;
-  price_change_pct: number;
-  num_agents: number;
-  num_cohorts: number;
-  total_months: number;
+  final_price?: number;
+  final_circulating_supply?: number;
+  total_sold_cumulative?: number;
+  total_staked_cumulative?: number;
+  avg_monthly_sell_pressure?: number;
+  max_monthly_sell_pressure?: number;
+  price_change_pct?: number;
+  num_agents?: number;
+  num_cohorts?: number;
+  total_months?: number;
+  max_sell_month?: number;
+  max_sell_tokens?: number;
+  total_tokens_sold?: number;
+  average_price?: number;
   staking_metrics?: StakingMetrics;
   treasury_metrics?: TreasuryMetrics;
 }
@@ -286,8 +291,8 @@ export interface ABMSimulationResults {
   cohort_metrics?: ABMCohortMetric[];
   summary: ABMSummaryCards;
   execution_time_seconds: number;
-  warnings: string[];
-  config: {
+  warnings?: string[];
+  config?: {
     num_agents: number;
     pricing_model: string;
     has_staking: boolean;

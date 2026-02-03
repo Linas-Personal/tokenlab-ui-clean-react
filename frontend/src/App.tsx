@@ -9,7 +9,6 @@ import type { ABMSimulationRequest } from '@/types/abm'
 import { TokenSetupTab } from '@/components/tabs/TokenSetupTab'
 import { VestingScheduleTab } from '@/components/tabs/VestingScheduleTab'
 import { AssumptionsTab } from '@/components/tabs/AssumptionsTab'
-import { ResultsTab } from '@/components/tabs/ResultsTab'
 import { ABMTab } from '@/components/tabs/ABMTab'
 import { ABMResultsTab } from '@/components/tabs/ABMResultsTab'
 import { useABMSimulation } from '@/hooks/useABMSimulation'
@@ -102,7 +101,7 @@ function App() {
       <main className="container mx-auto px-6 py-8">
         <FormProvider {...methods}>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-6 mb-8">
+            <TabsList className="grid w-full grid-cols-5 mb-8">
               <TabsTrigger value="token-setup" className="flex items-center gap-2">
                 <Coins className="h-4 w-4" />
                 <span className="hidden sm:inline">Token Setup</span>
@@ -118,10 +117,6 @@ function App() {
               <TabsTrigger value="abm" className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 <span className="hidden sm:inline">ABM Config</span>
-              </TabsTrigger>
-              <TabsTrigger value="results" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Results</span>
               </TabsTrigger>
               <TabsTrigger value="abm-results" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
@@ -143,10 +138,6 @@ function App() {
 
             <TabsContent value="abm">
               <ABMTab />
-            </TabsContent>
-
-            <TabsContent value="results">
-              <ResultsTab />
             </TabsContent>
 
             <TabsContent value="abm-results">

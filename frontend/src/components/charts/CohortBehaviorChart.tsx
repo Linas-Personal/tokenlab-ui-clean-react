@@ -44,12 +44,17 @@ const COHORT_COLORS: Record<string, string> = {
   Foundation: '#6366f1'
 }
 
-const formatNumber = (num: number): string => {
+const formatNumber = (num?: number): string => {
+  if (typeof num !== 'number' || !Number.isFinite(num)) {
+    return '—'
+  }
   if (num >= 1_000_000_000) {
     return `${(num / 1_000_000_000).toFixed(2)}B`
-  } else if (num >= 1_000_000) {
+  }
+  if (num >= 1_000_000) {
     return `${(num / 1_000_000).toFixed(2)}M`
-  } else if (num >= 1_000) {
+  }
+  if (num >= 1_000) {
     return `${(num / 1_000).toFixed(2)}K`
   }
   return num.toFixed(2)
@@ -79,6 +84,9 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   )
 }
 
+const resolveCohortName = (metric: ABMCohortMetric): string =>
+  metric.cohort ?? metric.cohort_name ?? 'Unknown'
+
 export function CohortBehaviorChart({ cohortMetrics, type = 'all' }: CohortBehaviorChartProps) {
   if (!cohortMetrics || cohortMetrics.length === 0) {
     return (
@@ -97,11 +105,12 @@ export function CohortBehaviorChart({ cohortMetrics, type = 'all' }: CohortBehav
   }
 
   // Group metrics by month
-  const monthlyData: Record<number, any> = {}
+  const monthlyData: Record<number, Record<string, number | string>> = {}
   const cohorts = new Set<string>()
 
   cohortMetrics.forEach(metric => {
-    cohorts.add(metric.cohort)
+    const cohortName = resolveCohortName(metric)
+    cohorts.add(cohortName)
 
     if (!monthlyData[metric.month_index]) {
       monthlyData[metric.month_index] = {
@@ -109,13 +118,15 @@ export function CohortBehaviorChart({ cohortMetrics, type = 'all' }: CohortBehav
       }
     }
 
-    monthlyData[metric.month_index][`${metric.cohort}_sold`] = metric.total_sold
-    monthlyData[metric.month_index][`${metric.cohort}_staked`] = metric.total_staked
-    monthlyData[metric.month_index][`${metric.cohort}_held`] = metric.total_held
-    monthlyData[metric.month_index][`${metric.cohort}_agents`] = metric.num_agents
+    monthlyData[metric.month_index][`${cohortName}_sold`] = metric.total_sold
+    monthlyData[metric.month_index][`${cohortName}_staked`] = metric.total_staked
+    monthlyData[metric.month_index][`${cohortName}_held`] = metric.total_held
+    monthlyData[metric.month_index][`${cohortName}_agents`] = metric.num_agents
   })
 
-  const chartData = Object.values(monthlyData).sort((a, b) => a.month - b.month)
+  const chartData = Object.values(monthlyData).sort(
+    (a, b) => Number(a.month) - Number(b.month)
+  )
   const cohortArray = Array.from(cohorts)
 
   const renderSellPressureChart = () => (
@@ -352,7 +363,7 @@ export function CohortBehaviorChart({ cohortMetrics, type = 'all' }: CohortBehav
           <h4 className="text-sm font-semibold mb-3">Cohort Summary</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             {cohortArray.map(cohort => {
-              const latestData = chartData[chartData.length - 1]
+              const latestData = chartData[chartData.length - 1] || {}
               const sold = latestData[`${cohort}_sold`] || 0
               const staked = latestData[`${cohort}_staked`] || 0
               const held = latestData[`${cohort}_held`] || 0
