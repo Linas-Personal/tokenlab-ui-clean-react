@@ -25,7 +25,7 @@ interface UseABMSimulationState {
   cached: boolean;
 }
 
-interface UseABMSimulationReturn extends UseABMSimulationState {
+export interface UseABMSimulationReturn extends UseABMSimulationState {
   submit: (config: ABMSimulationRequest) => Promise<JobSubmissionResponse>;
   fetchResults: () => Promise<void>;
   cancel: () => Promise<void>;
@@ -46,10 +46,42 @@ export function useABMSimulation(): UseABMSimulationReturn {
     cached: false
   });
 
+  const fetchResults = useCallback(async (jobIdOverride?: string): Promise<void> => {
+    const jobId = jobIdOverride || state.jobId;
+
+    if (!jobId) {
+      throw new Error('No job ID available');
+    }
+
+    try {
+      const results = await getJobResults(jobId);
+      setState(prev => ({
+        ...prev,
+        results,
+        isCompleted: true,
+        isRunning: false,
+        isFailed: false,
+        error: null
+      }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch results';
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+        isFailed: true,
+        isRunning: false
+      }));
+      throw error;
+    }
+  }, [state.jobId]);
+
   const submit = useCallback(async (config: ABMSimulationRequest): Promise<JobSubmissionResponse> => {
     setState(prev => ({
       ...prev,
       isSubmitting: true,
+      isFailed: false,
+      isCancelled: false,
+      isCompleted: false,
       error: null,
       results: null
     }));
@@ -62,6 +94,7 @@ export function useABMSimulation(): UseABMSimulationReturn {
         isSubmitting: false,
         isRunning: !response.cached,
         isCompleted: response.cached,
+        isFailed: false,
         jobId: response.job_id,
         cached: response.cached,
         error: null
@@ -82,35 +115,7 @@ export function useABMSimulation(): UseABMSimulationReturn {
       }));
       throw error;
     }
-  }, []);
-
-  const fetchResults = useCallback(async (jobIdOverride?: string): Promise<void> => {
-    const jobId = jobIdOverride || state.jobId;
-
-    if (!jobId) {
-      throw new Error('No job ID available');
-    }
-
-    try {
-      const results = await getJobResults(jobId);
-      setState(prev => ({
-        ...prev,
-        results,
-        isCompleted: true,
-        isRunning: false,
-        error: null
-      }));
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch results';
-      setState(prev => ({
-        ...prev,
-        error: errorMessage,
-        isFailed: true,
-        isRunning: false
-      }));
-      throw error;
-    }
-  }, [state.jobId]);
+  }, [fetchResults]);
 
   const cancel = useCallback(async (): Promise<void> => {
     if (!state.jobId) {
@@ -123,6 +128,7 @@ export function useABMSimulation(): UseABMSimulationReturn {
         ...prev,
         isRunning: false,
         isCancelled: true,
+        isFailed: false,
         error: null
       }));
     } catch (error) {

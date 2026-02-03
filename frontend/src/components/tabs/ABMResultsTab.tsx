@@ -12,16 +12,17 @@ import { CohortBehaviorChart } from '@/components/charts/CohortBehaviorChart'
 import { PriceEvolutionChart } from '@/components/charts/PriceEvolutionChart'
 import { CirculatingSupplyChart } from '@/components/charts/CirculatingSupplyChart'
 import { SellPressureChart } from '@/components/charts/SellPressureChart'
-import { useABMSimulation } from '@/hooks/useABMSimulation'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import type { JobStatusResponse } from '@/types/abm'
 import { hasStakingMetrics, hasTreasuryMetrics } from '@/types/abm'
+import type { UseABMSimulationReturn } from '@/hooks/useABMSimulation'
 
 interface ABMResultsTabProps {
+  simulation: UseABMSimulationReturn
   onRunSimulation?: () => void
 }
 
-export function ABMResultsTab({ onRunSimulation }: ABMResultsTabProps) {
+export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProps) {
   const {
     isSubmitting,
     isRunning,
@@ -32,7 +33,7 @@ export function ABMResultsTab({ onRunSimulation }: ABMResultsTabProps) {
     results,
     cached,
     fetchResults
-  } = useABMSimulation()
+  } = simulation
 
   const {
     status: jobStatus,
