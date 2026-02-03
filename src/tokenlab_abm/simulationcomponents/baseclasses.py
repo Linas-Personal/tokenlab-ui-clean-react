@@ -6,22 +6,24 @@ Created on Fri Nov 18 12:17:07 2022
 @author: stylianoskampakis
 """
 from typing import List, Dict, Union
+from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 
 
-class AddOn:
+class AddOn(ABC):
     """
     Class which is used within controllers to affect certain internal parameters (e.g. noise)
     """
 
     def __init__(self):
 
-        pass
+        super().__init__()
 
-    def apply(self) -> float:
-
-        pass
+    @abstractmethod
+    def apply(self, **kwargs) -> float:
+        """Apply the add-on transformation."""
+        raise NotImplementedError("AddOn subclasses must implement apply().")
 
 
 class Initialisable:
@@ -212,7 +214,7 @@ class AgentPool(Controller):
         return self.new_pools
 
 
-class TokenEconomy:
+class TokenEconomy(ABC):
     """
     Base class for simulating a token economy system.
     """
@@ -292,11 +294,12 @@ class TokenEconomy:
             []
         )  # List to store the number of transactions over time
 
+    @abstractmethod
     def execute(self):
         """
-        Placeholder method to execute a simulation step.
+        Execute a simulation step.
         """
-        pass
+        raise NotImplementedError("TokenEconomy subclasses must implement execute().")
 
     def get_state(self) -> Dict[str, Union[float, int]]:
         """

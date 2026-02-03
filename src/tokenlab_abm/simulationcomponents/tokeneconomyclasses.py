@@ -701,7 +701,24 @@ class TokenMetaSimulator:
                 "You must first run execute() to collect data before using this function!"
             )
 
-        pass
+        # TODO: Extend sensitivity analysis to support non-linear relationships and lagged effects.
+        numeric_data = self.data.select_dtypes(include=[np.number])
+        if numeric_data.empty:
+            raise ValueError("No numeric data available for sensitivity analysis.")
+
+        price_columns = [col for col in numeric_data.columns if col.endswith("_price")]
+        if not price_columns:
+            raise ValueError("No price column found in simulation data.")
+
+        price_column = price_columns[0]
+        correlations = numeric_data.corr()[price_column].drop(price_column)
+        analysis_df = (
+            correlations.to_frame(name="correlation")
+            .assign(abs_correlation=correlations.abs())
+            .sort_values("abs_correlation", ascending=False)
+        )
+
+        return analysis_df
 
     def get_timeseries(
         self,

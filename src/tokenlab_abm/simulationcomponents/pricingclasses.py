@@ -11,6 +11,7 @@ import scipy
 from scipy.stats import binom, norm
 from typing import Union, TypeVar, Callable
 from typing import List, Dict, Union, Tuple
+from abc import ABC, abstractmethod
 from baseclasses import Controller, TokenEconomy, AddOn
 import pandas as pd
 from tqdm import tqdm
@@ -19,7 +20,7 @@ import time
 from addons import AddOn_RandomNoise, AddOn_RandomNoiseProportional
 
 
-class HoldingTimeController(Controller):
+class HoldingTimeController(Controller, ABC):
     """
     Abstract class from which all HoldingTime controllers should inherit.
     """
@@ -31,9 +32,10 @@ class HoldingTimeController(Controller):
     def get_holding_time(self) -> float:
         return self.holding_time
 
+    @abstractmethod
     def execute(self) -> float:
-
-        pass
+        """Compute and store the current holding time."""
+        raise NotImplementedError("HoldingTimeController subclasses must implement execute().")
 
 
 class HoldingTime_Constant(HoldingTimeController):
@@ -193,7 +195,7 @@ class HoldingTime_Adaptive(HoldingTimeController):
         self.holding_time = holding_time
 
 
-class PriceFunctionController(Controller):
+class PriceFunctionController(Controller, ABC):
     """
     Abstract class for price controllers.
 
@@ -204,9 +206,10 @@ class PriceFunctionController(Controller):
         self.dependencies = {TokenEconomy: None}
         self.price = None
 
+    @abstractmethod
     def execute(self) -> float:
-        iteration += 1
-        pass
+        """Compute and store the current price."""
+        raise NotImplementedError("PriceFunctionController subclasses must implement execute().")
 
     def get_price(self) -> float:
 

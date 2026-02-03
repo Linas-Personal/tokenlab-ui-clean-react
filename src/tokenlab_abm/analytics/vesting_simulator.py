@@ -1211,6 +1211,7 @@ class DynamicPricingController:
         - constant: Fixed price (Tier 1 behavior)
         - linear: P = P0 * (1 - elasticity * (S/S_max))
         - bonding_curve: P = P0 * (1 - S/S_max) ^ elasticity
+        - bonding_curve: P = P0 * (1 - (S / S_max)) ^ elasticity
         """
         if not self.pricing_config.get("enabled", False):
             return self.initial_price
@@ -1235,6 +1236,7 @@ class DynamicPricingController:
             supply_ratio = circulating_supply / self.max_supply if self.max_supply > 0 else 0
             supply_ratio = min(max(supply_ratio, 0.0), 1.0)
             price = self.initial_price * ((1 - supply_ratio) ** elasticity)
+            price = self.initial_price * (1 - supply_ratio) ** elasticity
             price = max(0.01, price)
 
         else:

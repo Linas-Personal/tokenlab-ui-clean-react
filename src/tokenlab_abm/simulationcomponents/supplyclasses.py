@@ -19,7 +19,7 @@ import scipy.stats
 from typing import Union
 
 
-class SupplyController(Controller):
+class SupplyController(Controller, ABC):
     """
     Base class for other supply controllers.
     """
@@ -33,9 +33,10 @@ class SupplyController(Controller):
 
         return self.supply
 
+    @abstractmethod
     def execute(self) -> float:
-
-        pass
+        """Return the current supply value."""
+        raise NotImplementedError("SupplyController subclasses must implement execute().")
 
     def reset(self) -> bool:
 
@@ -246,13 +247,15 @@ class SupplyStaker(SupplyController, ABC):
 
         self._staking_amount = 0
 
-    @abstractmethod
-    def execute(self):
+    def _apply_quit_logic(self) -> None:
         self.source = self.get_linked_agentpool().treasury
         if np.random.rand() < self._quit_prob:
             self.quit_staking()
 
-        pass
+    @abstractmethod
+    def execute(self):
+        """Execute staking supply adjustments for the current iteration."""
+        raise NotImplementedError("SupplyStaker subclasses must implement execute().")
 
 
 class SupplyStakerLockup(SupplyStaker):
@@ -262,6 +265,7 @@ class SupplyStakerLockup(SupplyStaker):
         rewards: Union[float, scipy.stats.rv_continuous],
         lockup_duration: int,
         reward_as_perc: bool = True,
+        quit_prob: float = 0,
     ):
         """
         Staking class for lockup types of vaults
@@ -282,10 +286,12 @@ class SupplyStakerLockup(SupplyStaker):
         """
         super(SupplyStakerLockup, self).__init__(staking_amount, quit_prob=quit_prob)
         self.lockup_duration = lockup_duration
+        self.staking_amount = staking_amount
+        self.rewards = rewards
         self.reward_as_perc = reward_as_perc
 
     def execute(self):
-        self.source = get_linked_agentpool().treasury
+        self.source = self.get_linked_agentpool().treasury
 
         if self._iteration == 0:
             value = -1 * self._get_value(self.staking_amount)
@@ -304,7 +310,7 @@ class SupplyStakerLockup(SupplyStaker):
         if self.source is None:
             self.supply = value
         else:
-            agentpool = get_linked_agentpool()
+            agentpool = self.get_linked_agentpool()
             currency = agentpool.currency
             # remove from treasury
             agentpool.treasury.retrieve_asset(currency_symbol=currency, value=value)
@@ -313,13 +319,12 @@ class SupplyStakerLockup(SupplyStaker):
 
         self._iteration += 1
 
-        if np.random.rand() < self._quit_prob:
-            self.quit_staking()
+        self._apply_quit_logic()
 
     def _get_value(self, param):
         try:
             return param.rvs(1)[0]  # Sample from the distribution
-        except:
+        except (AttributeError, TypeError):
             return param  # Use the float value directly
 
 
@@ -351,13 +356,15 @@ class SupplyStakerMonthly(SupplyStaker):
         None.
 
         """
-        super(SupplyStakerMonthly, self).__init__(quit_prob=quit_prob)
+        super(SupplyStakerMonthly, self).__init__(
+            staking_amount=staking_amount, quit_prob=quit_prob
+        )
         self.staking_amount = staking_amount
         self.rewards = rewards
         self.reward_as_perc = reward_as_perc
 
     def execute(self):
-        self.source = super().get_linked_agentpool().treasury
+        self.source = self.get_linked_agentpool().treasury
 
         if self._iteration == 0:
             value = -1 * self._get_value(self.staking_amount)
@@ -372,7 +379,7 @@ class SupplyStakerMonthly(SupplyStaker):
         if self.source is None:
             self.supply = value
         else:
-            agentpool = super().get_linked_agentpool()
+            agentpool = self.get_linked_agentpool()
             currency = agentpool.currency
             # remove from treasury
             agentpool.treasury.execute(currency_symbol=currency, value=value)
@@ -381,13 +388,12 @@ class SupplyStakerMonthly(SupplyStaker):
 
         self._iteration += 1
 
-        if np.random.rand() < self._quit_prob:
-            self.quit_staking()
+        self._apply_quit_logic()
 
     def _get_value(self, param):
         try:
             return param.rvs(1)[0]
-        except:
+        except (AttributeError, TypeError):
             return param
 
 
