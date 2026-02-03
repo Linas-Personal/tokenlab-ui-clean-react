@@ -54,7 +54,10 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
     }
   }, [jobId, jobStatus, results, fetchResults])
 
-  const formatNumber = (num: number): string => {
+  const formatNumber = (num?: number): string => {
+    if (typeof num !== 'number' || !Number.isFinite(num)) {
+      return '—'
+    }
     if (num >= 1_000_000_000) {
       return `${(num / 1_000_000_000).toFixed(2)}B`
     } else if (num >= 1_000_000) {
@@ -63,6 +66,28 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
       return `${(num / 1_000).toFixed(2)}K`
     }
     return num.toFixed(2)
+  }
+
+  const formatPrice = (value?: number, decimals = 4): string => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return '—'
+    }
+    return value.toFixed(decimals)
+  }
+
+  const formatDuration = (seconds?: number): string => {
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+      return '—'
+    }
+    return `${seconds.toFixed(2)}s`
+  }
+
+  const averagePrice = (): string => {
+    if (!results?.global_metrics?.length) {
+      return '—'
+    }
+    const total = results.global_metrics.reduce((sum, m) => sum + m.price, 0)
+    return formatPrice(total / results.global_metrics.length, 4)
   }
 
   const renderEmptyState = () => (
@@ -182,7 +207,7 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
                 <CardTitle>ABM Simulation Complete</CardTitle>
                 <CardDescription>
                   {cached && 'Cached result - '}
-                  Completed in {results.execution_time_seconds.toFixed(2)}s
+                  Completed in {formatDuration(results.execution_time_seconds)}
                 </CardDescription>
               </div>
               <CheckCircle2 className="h-8 w-8 text-green-600" />
@@ -192,7 +217,7 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Final Price</p>
-                <p className="text-2xl font-bold">${results.summary.final_price.toFixed(4)}</p>
+                <p className="text-2xl font-bold">${formatPrice(results.summary.final_price, 4)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Final Supply</p>
@@ -204,7 +229,7 @@ export function ABMResultsTab({ simulation, onRunSimulation }: ABMResultsTabProp
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Avg Price</p>
-                <p className="text-2xl font-bold">${(results.global_metrics.reduce((sum, m) => sum + m.price, 0) / results.global_metrics.length).toFixed(4)}</p>
+                <p className="text-2xl font-bold">${averagePrice()}</p>
               </div>
             </div>
 
