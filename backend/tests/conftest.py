@@ -1,5 +1,8 @@
 """Pytest configuration and fixtures for test suite."""
 
+import os
+os.environ["RATE_LIMIT_ENABLED"] = "true"
+
 import pytest
 from contextlib import asynccontextmanager
 from fastapi.testclient import TestClient
