@@ -1,67 +1,54 @@
 import { useState, useRef } from 'react'
 import { useForm, FormProvider } from 'react-hook-form'
-import { useMutation } from '@tanstack/react-query'
 import { Coins, Calendar, Settings, BarChart3, Loader2, Upload, Sparkles } from 'lucide-react'
-import { submitABMSimulation } from '@/lib/abm-api'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { DEFAULT_CONFIG } from '@/lib/constants'
 import type { SimulationConfig } from '@/types/config'
+import type { ABMSimulationRequest } from '@/types/abm'
 import { TokenSetupTab } from '@/components/tabs/TokenSetupTab'
 import { VestingScheduleTab } from '@/components/tabs/VestingScheduleTab'
 import { AssumptionsTab } from '@/components/tabs/AssumptionsTab'
 import { ResultsTab } from '@/components/tabs/ResultsTab'
 import { ABMTab } from '@/components/tabs/ABMTab'
 import { ABMResultsTab } from '@/components/tabs/ABMResultsTab'
+import { useABMSimulation } from '@/hooks/useABMSimulation'
 
 function App() {
   const [activeTab, setActiveTab] = useState('token-setup')
-  const [isABMSimulating, setIsABMSimulating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const abmSimulation = useABMSimulation()
 
   const methods = useForm<SimulationConfig>({
     defaultValues: DEFAULT_CONFIG
   })
 
-  const abmSimulation = useMutation({
-    mutationFn: async (config: any) => {
-      setIsABMSimulating(true)
-      const result = await submitABMSimulation(config)
-      setActiveTab('abm-results')
-      return result
+  const buildABMConfig = (data: SimulationConfig): ABMSimulationRequest => ({
+    token: {
+      name: data.token.name,
+      total_supply: data.token.total_supply,
+      start_date: data.token.start_date,
+      horizon_months: data.token.horizon_months
     },
-    onSuccess: () => {
-      setIsABMSimulating(false)
-    },
-    onError: () => {
-      setIsABMSimulating(false)
-    }
+    buckets: data.buckets.map((bucket) => ({
+      bucket: bucket.bucket,
+      allocation: bucket.allocation,
+      tge_unlock_pct: bucket.tge_unlock_pct,
+      cliff_months: bucket.cliff_months,
+      vesting_months: bucket.vesting_months
+    })),
+    abm: data.abm,
+    monte_carlo: data.monte_carlo?.enabled ? data.monte_carlo : undefined
   })
 
-  const onABMSubmit = (data: any) => {
-    const abmConfig = {
-      token: {
-        name: data.token.name,
-        total_supply: data.token.total_supply,
-        start_date: data.token.start_date,
-        horizon_months: data.token.horizon_months
-      },
-      buckets: data.buckets.map((b: any) => ({
-        bucket: b.bucket,
-        allocation: b.allocation,
-        tge_unlock_pct: b.tge_unlock_pct,
-        cliff_months: b.cliff_months,
-        vesting_months: b.vesting_months
-      })),
-      abm: data.abm,
-      monte_carlo: data.monte_carlo?.enabled ? data.monte_carlo : undefined
+  const handleRunABMSimulation = methods.handleSubmit(async (data) => {
+    setActiveTab('abm-results')
+    try {
+      await abmSimulation.submit(buildABMConfig(data))
+    } catch {
+      // Error state is handled in the simulation hook and results tab.
     }
-    abmSimulation.mutate(abmConfig)
-  }
-
-  const handleRunABMSimulation = () => {
-    methods.handleSubmit(onABMSubmit)()
-  }
+  })
 
   const handleImportConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -163,7 +150,10 @@ function App() {
             </TabsContent>
 
             <TabsContent value="abm-results">
-              <ABMResultsTab onRunSimulation={() => setActiveTab('abm')} />
+              <ABMResultsTab
+                simulation={abmSimulation}
+                onRunSimulation={() => setActiveTab('abm')}
+              />
             </TabsContent>
           </Tabs>
         </FormProvider>
@@ -172,9 +162,9 @@ function App() {
           <Button
             size="lg"
             onClick={handleRunABMSimulation}
-            disabled={isABMSimulating}
+            disabled={abmSimulation.isSubmitting || abmSimulation.isRunning}
           >
-            {isABMSimulating ? (
+            {abmSimulation.isSubmitting || abmSimulation.isRunning ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Running ABM Simulation...
