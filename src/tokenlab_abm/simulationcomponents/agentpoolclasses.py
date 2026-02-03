@@ -802,17 +802,17 @@ class AgentPool_Conditional(Initialisable, AgentPool):
         if self.dependencies[TokenEconomy] is None:
             return False
 
-        try:
+        if self.users_controller is not None:
+            if not hasattr(self.users_controller, "test_integrity"):
+                return False
             if not self.users_controller.test_integrity():
                 return False
-        except AttributeError:
-            pass
 
-        try:
+        if self.transactions_controller is not None:
+            if not hasattr(self.transactions_controller, "test_integrity"):
+                return False
             if not self.transactions_controller.test_integrity():
                 return False
-        except AttributeError:
-            pass
 
         return True
     

@@ -6,6 +6,7 @@ Created on Fri Nov 18 12:19:09 2022
 @author: stylianoskampakis
 """
 from baseclasses import *
+from abc import ABC, abstractmethod
 from typing import List, Dict, Union
 from usergrowthclasses import UserGrowth
 import scipy
@@ -17,7 +18,7 @@ import time
 from matplotlib import pyplot as plt
 
 
-class TransactionManagement(Controller):
+class TransactionManagement(Controller, ABC):
     """
     Abstract class.
 
@@ -36,6 +37,7 @@ class TransactionManagement(Controller):
         self._ignore_num_users = ignore_num_users
         self.num_transactions = 1
 
+    @abstractmethod
     def execute(self, dependency: str = "AgentPool"):
         """
 
@@ -53,7 +55,9 @@ class TransactionManagement(Controller):
 
         """
 
-        return None
+        raise NotImplementedError(
+            "TransactionManagement subclasses must implement execute()."
+        )
 
     def reset(self) -> None:
         """
@@ -62,7 +66,9 @@ class TransactionManagement(Controller):
         """
 
         self.iteration = 0
-        pass
+        self.transactions_value = None
+        self._transactions_value_store = []
+        self.num_transactions = 1
 
     def get_transactions(self) -> List:
 
