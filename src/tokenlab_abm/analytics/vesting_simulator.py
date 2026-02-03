@@ -129,7 +129,7 @@ def validate_config(config: Dict) -> List[str]:
     # Validate buckets
     if "buckets" not in config or not config["buckets"]:
         warnings_list.append("At least one bucket should be defined")
-        config["buckets"] = []  # Set empty list as fallback
+        config["buckets"] = []
 
     total_supply = token_config.get("total_supply", 1_000_000)
     allocation_sum = 0
@@ -979,12 +979,10 @@ Key Metrics:
             pdf.savefig(fig_summary, bbox_inches="tight")
             plt.close(fig_summary)
 
-            # Pages 2-4: Charts
             for fig in figs:
                 pdf.savefig(fig, bbox_inches="tight")
                 plt.close(fig)
 
-            # Metadata
             d = pdf.infodict()
             d["Title"] = "TokenLab Vesting Analysis"
             d["Author"] = "TokenLab Vesting Simulator"
@@ -994,25 +992,12 @@ Key Metrics:
         return output_path
 
     def to_json(self) -> str:
-        """
-        Export configuration as JSON string.
-
-        Returns:
-            JSON string of configuration
-        """
+        """Export configuration as JSON string."""
         return json.dumps(self.config, indent=2)
 
     @staticmethod
     def from_json(json_str: str) -> "VestingSimulator":
-        """
-        Create simulator from JSON configuration.
-
-        Args:
-            json_str: JSON string of configuration
-
-        Returns:
-            VestingSimulator instance
-        """
+        """Create simulator from a JSON string."""
         config = json.loads(json_str)
         return VestingSimulator(config)
 
@@ -1022,15 +1007,9 @@ Key Metrics:
 # =============================================================================
 
 class VestingTokenEconomy:
-    """
-    Lightweight TokenEconomy wrapper for vesting simulator.
-
-    Provides minimal TokenLab API surface for pricing/treasury/staking
-    without full agent-based simulation overhead.
-    """
+    """Minimal TokenLab surface for vesting simulation."""
 
     def __init__(self, config: Dict):
-        """Initialize vesting token economy."""
         self.config = config
         self.supply = config["token"]["total_supply"]
         self.circulating_supply = 0.0
@@ -1041,34 +1020,28 @@ class VestingTokenEconomy:
         self.token = config["token"].get("name", "TokenA")
         self.fiat = "$"
 
-        # Historical stores
         self._supply_store = [self.supply]
         self._circulating_store = [0.0]
         self._price_store = [self.price]
         self._iteration_store = [0]
 
-        # Tier 2 components
         self.pricing_controller = None
         self.treasury = None
         self.staking_capacity_used = 0.0
         self.staking_capacity_max = 0.0
 
     def change_supply(self, delta: float):
-        """Change total supply (e.g., from buybacks)."""
         self.supply += delta
         self.supply = max(0, self.supply)
 
     def update_price(self, new_price: float):
-        """Update current price."""
         self.price = max(0.0001, new_price)
 
     def update_circulating(self, new_circulating: float):
-        """Update circulating supply."""
         self.expected_circulating = new_circulating
         self.circulating_supply = new_circulating
 
     def advance_iteration(self):
-        """Move to next iteration/month."""
         self.iteration += 1
         self._supply_store.append(self.supply)
         self._circulating_store.append(self.circulating_supply)
@@ -1076,7 +1049,6 @@ class VestingTokenEconomy:
         self._iteration_store.append(self.iteration)
 
     def reset(self):
-        """Reset state for Monte Carlo trials."""
         self.supply = self.config["token"]["total_supply"]
         self.circulating_supply = 0.0
         self.expected_circulating = 0.0
@@ -1094,15 +1066,10 @@ class DynamicStakingController:
     """
     Dynamic staking with APY incentives and capacity limits.
 
-    Replaces simple relock with realistic staking behavior:
-    - APY-based participation incentives
-    - Capacity limits (max % of circulating can stake)
-    - Yield generation (optional)
-    - Maturity tracking
+    Supports APY incentives, capacity limits, and maturity tracking.
     """
 
     def __init__(self, config: Dict, vesting_economy):
-        """Initialize dynamic staking controller."""
         self.config = config
         self.vesting_economy = vesting_economy
         self.staking_config = config.get("tier2", {}).get("staking", {})
@@ -1624,7 +1591,6 @@ class VestingSimulatorAdvanced(VestingSimulator):
         """
         super().__init__(config, mode)
 
-        # Initialize Tier 2/3 components
         self.vesting_economy = None
         self.staking_controller = None
         self.pricing_controller = None
@@ -1637,16 +1603,13 @@ class VestingSimulatorAdvanced(VestingSimulator):
 
     def _initialize_advanced_components(self):
         """Initialize Tier 2/3 components."""
-        # Create vesting economy wrapper
         self.vesting_economy = VestingTokenEconomy(self.config)
 
-        # Tier 2 components
         self.staking_controller = DynamicStakingController(self.config, self.vesting_economy)
         self.pricing_controller = DynamicPricingController(self.config, self.vesting_economy)
         self.treasury_controller = TreasuryStrategyController(self.config, self.vesting_economy)
         self.volume_calculator = DynamicVolumeCalculator(self.config)
 
-        # Tier 3 components
         if self.mode == "tier3":
             self.cohort_controller = CohortBehaviorController(self.config)
 
@@ -1658,36 +1621,29 @@ class VestingSimulatorAdvanced(VestingSimulator):
             (df_bucket, df_global) - per-bucket and aggregate dataframes
         """
         if self.mode == "tier1":
-            # Use parent Tier 1 implementation
             return super().run_simulation()
 
-        # Extract config values
         horizon = self.config["token"]["horizon_months"]
         self.total_supply = self.config["token"]["total_supply"]
         self.start_date = datetime.strptime(self.config["token"]["start_date"], "%Y-%m-%d")
         self.expected_circulating = 0.0
 
-        # Use existing bucket controllers from parent
         bucket_controllers = self.bucket_controllers
 
-        # Generate price series (if not using dynamic pricing)
         use_dynamic_pricing = (self.pricing_controller and
                               self.pricing_controller.pricing_config.get("enabled", False))
         price_series = None if use_dynamic_pricing else self._generate_price_series()
 
-        # Simulation loop
         bucket_rows = []
         global_rows = []
 
         for month_index in range(horizon + 1):
             month_date = self.start_date + relativedelta(months=month_index)
 
-            # Month start: check for matured stakes
             matured_stake = 0.0
             if self.staking_controller:
                 matured_stake = self.staking_controller.get_matured_stake(month_index)
 
-            # Process each bucket
             month_total_unlocked = matured_stake
             month_total_sell = 0.0
             liquidity_deployed = 0.0
@@ -1695,43 +1651,35 @@ class VestingSimulatorAdvanced(VestingSimulator):
             for controller in bucket_controllers:
                 bucket_name = controller.config.get("bucket", "Unknown")
 
-                # Get price (dynamic or from series)
                 if self.pricing_controller and self.pricing_controller.pricing_config.get("enabled", False):
                     current_price = self.pricing_controller.calculate_price(self.vesting_economy.circulating_supply)
                     self.vesting_economy.update_price(current_price)
                 else:
-                    # Safely access price series
                     if price_series and isinstance(price_series, list) and month_index < len(price_series):
                         current_price = price_series[month_index]
                     else:
                         current_price = 1.0
 
-                # Execute bucket vesting
                 initial_price = self.pricing_controller.initial_price if self.pricing_controller else 1.0
                 unlocked = controller.execute(month_index, current_price, initial_price)
 
-                # Apply cohort behavior multiplier (Tier 3)
                 sell_multiplier = 1.0
                 if self.cohort_controller:
                     sell_multiplier = self.cohort_controller.get_behavior_multiplier(bucket_name)
 
-                # Handle treasury bucket specially
                 if bucket_name.lower() == "treasury" and self.treasury_controller:
                     self.treasury_controller.add_tokens(unlocked)
                     held, liquidity, buyback = self.treasury_controller.deploy_strategy(month_index)
                     liquidity_deployed += liquidity
-                    expected_sell = 0.0  # Treasury doesn't sell directly
-                    adjusted_sell_pressure = 0.0  # Treasury doesn't sell
+                    expected_sell = 0.0
+                    adjusted_sell_pressure = 0.0
                 else:
-                    # Apply staking (Tier 2)
                     if self.staking_controller and month_index > 0:
                         free_amount, staked_amount = self.staking_controller.apply_staking(unlocked, month_index)
                     else:
                         free_amount = unlocked
                         staked_amount = 0.0
 
-                    # Calculate expected sell with cohort multiplier
-                    # Get base sell pressure from global config
                     sell_pressure_level = self.config["assumptions"]["sell_pressure_level"]
                     base_sell_pressure = SELL_PRESSURE_LEVELS[sell_pressure_level]
                     adjusted_sell_pressure = min(1.0, base_sell_pressure * sell_multiplier)
@@ -1740,11 +1688,9 @@ class VestingSimulatorAdvanced(VestingSimulator):
                 month_total_unlocked += unlocked
                 month_total_sell += expected_sell
 
-                # Get bucket state
                 unlocked_cumulative = controller.unlocked_cumulative
                 locked_remaining = controller.locked_remaining
 
-                # Store bucket row
                 bucket_rows.append({
                     "month_index": month_index,
                     "date": month_date.strftime("%Y-%m-%d"),
@@ -1758,7 +1704,6 @@ class VestingSimulatorAdvanced(VestingSimulator):
                     "expected_circulating_cumulative": unlocked_cumulative
                 })
 
-            # Update global circulating supply
             new_circulating = self.expected_circulating + month_total_unlocked
             if self.treasury_controller:
                 new_circulating += liquidity_deployed  # Liquidity counts as circulating
@@ -1766,25 +1711,21 @@ class VestingSimulatorAdvanced(VestingSimulator):
             self.expected_circulating = new_circulating
             self.vesting_economy.update_circulating(new_circulating)
 
-            # Calculate dynamic volume (Tier 2)
-            avg_daily_volume = 1_000_000  # Default fallback
+            avg_daily_volume = 1_000_000
             if self.volume_calculator:
                 try:
                     avg_daily_volume = self.volume_calculator.calculate_volume(
                         new_circulating, liquidity_deployed
                     )
                 except Exception as e:
-                    # Log error but continue with default volume
                     import warnings
                     warnings.warn(f"Volume calculation failed (month {month_index}): {str(e)}. Using default.")
 
-            # Try to get from config as secondary option
             if not self.volume_calculator:
                 config_volume = self.config.get("assumptions", {}).get("avg_daily_volume_tokens")
                 if config_volume:
                     avg_daily_volume = config_volume
 
-            # Store global row
             circulating_pct = (new_circulating / self.total_supply * 100) if self.total_supply > 0 else 0
             sell_volume_ratio = (month_total_sell / avg_daily_volume) if avg_daily_volume > 0 else 0
 
@@ -1802,19 +1743,15 @@ class VestingSimulatorAdvanced(VestingSimulator):
                 "treasury_balance": self.treasury_controller.holdings if self.treasury_controller else None
             })
 
-            # Advance economy iteration
             if self.vesting_economy:
                 self.vesting_economy.advance_iteration()
 
-        # Convert to DataFrames
         df_bucket = pd.DataFrame(bucket_rows)
         df_global = pd.DataFrame(global_rows)
 
-        # Store results (parent class uses df_bucket_long)
         self.df_bucket_long = df_bucket
         self.df_global = df_global
 
-        # Calculate summary cards
         self.summary_cards = self._calculate_summary_cards()
 
         return df_bucket, df_global
